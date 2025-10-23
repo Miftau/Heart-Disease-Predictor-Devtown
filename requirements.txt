@@ -5,3 +5,4 @@ seaborn~=0.13.2
 joblib~=1.5.0
 scikit-learn
 flask
+gunicorn

@@ -7,10 +7,11 @@ import pandas as pd
 import numpy as np
 import joblib
 
+
 # CONFIG
 MODEL_FILE = "heart_rf_model.pkl"      # trained RandomForest model
 SCALER_FILE = "heart_scaler.pkl"       # fitted StandardScaler
-TEMPLATE_FILE = "heart_user_template.csv"  # contains X.columns (one-hot encoded columns)
+TEMPLATE_FILE = "heart_user_template.csv"  # contains X.columns 
 RESULTS_DIR = os.path.join("static", "results")
 BASE_COLUMNS = [
     "age","sex","cp","trestbps","chol","fbs","restecg",
@@ -21,6 +22,8 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret")  # change in prod
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
 
 # Load model, scaler, and feature columns
 if not (os.path.exists(MODEL_FILE) and os.path.exists(SCALER_FILE) and os.path.exists(TEMPLATE_FILE)):
