@@ -1,19 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Prediction Results</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <h1>✅ Prediction Results</h1>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+  <div class="max-w-4xl w-full bg-white rounded-2xl shadow-lg p-8">
+    <h1 class="text-2xl font-bold mb-4">Prediction Results</h1>
 
-    {{ tables|safe }}
+    {% if result %}
+      <div class="mb-6">
+        {% if 'No Heart' in result %}
+          <div class="p-4 bg-green-50 border border-green-200 rounded">
+            <h2 class="text-lg font-semibold text-green-700">{{ result }}</h2>
+            <p class="text-sm text-green-700 mt-1">Probability: {{ prob }} — Risk Level: <strong>{{ risk }}</strong></p>
+          </div>
+        {% else %}
+          <div class="p-4 bg-red-50 border border-red-200 rounded">
+            <h2 class="text-lg font-semibold text-red-700">{{ result }}</h2>
+            <p class="text-sm text-red-700 mt-1">Probability: {{ prob }} — Risk Level: <strong>{{ risk }}</strong></p>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
 
-    <a href="{{ download_link }}" class="download-btn">⬇️ Download CSV</a>
-    <br><br>
-    <a href="/">🔁 Make another prediction</a>
+    {% if tables %}
+      <div class="overflow-x-auto mb-4">
+        {{ tables|safe }}
+      </div>
+    {% endif %}
+
+    {% if download_link %}
+      <a href="{{ download_link }}" download class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded mr-3">⬇️ Download CSV</a>
+    {% endif %}
+
+    <a href="/" class="inline-block bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded">🔙 Back</a>
   </div>
 </body>
 </html>

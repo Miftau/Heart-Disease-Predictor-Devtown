@@ -33,7 +33,12 @@ if not os.path.exists(DATA_PATH):
         f"❌ Dataset not found! Place 'heart_disease_uci.csv' in this directory or update DATA_PATH."
     )
 
-df = pd.read_csv(DATA_PATH)
+column_names = [
+    "age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
+    "thalach", "exang", "oldpeak", "slope", "ca", "thal", "num"
+]
+
+df = pd.read_csv(DATA_PATH, names=column_names, header=0)
 
 print("✅ Data loaded successfully!")
 print(df.head())

@@ -1,0 +1,2 @@
+age,sex,cp,trestbps,chol,fbs,restecg,thalach,exang,oldpeak,slope,ca_0.0,ca_1.0,ca_2.0,ca_3.0,ca_?,thal_3.0,thal_6.0,thal_7.0,thal_?
+63.0,1.0,1.0,145.0,233.0,1.0,2.0,150.0,0.0,2.3,3.0,True,False,False,False,False,False,True,False,False
