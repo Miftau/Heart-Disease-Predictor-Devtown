@@ -17,10 +17,10 @@ BASE_COLUMNS = [
     "age","sex","cp","trestbps","chol","fbs","restecg",
     "thalach","exang","oldpeak","slope","ca","thal"
 ]
-
+static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=static_folder_path)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret")  # change in prod
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
