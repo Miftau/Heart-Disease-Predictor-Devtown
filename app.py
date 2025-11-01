@@ -200,6 +200,10 @@ def predict():
     except Exception as e:
         # Safe error message
         return render_template("index.html", error=f"Error processing request: {str(e)}")
+    
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 @app.route("/download/<path:filename>")
 def download_file(filename):
