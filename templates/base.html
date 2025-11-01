@@ -10,18 +10,21 @@
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
   <!-- Navbar -->
-  <nav class="bg-white shadow-md py-4">
+    <nav class="bg-white shadow-md py-4 sticky top-0 z-50">
     <div class="container mx-auto flex justify-between items-center px-6">
-      <a href="/" class="text-xl font-bold text-red-500">❤️ HeartPredict</a>
-      <ul class="flex space-x-6 text-gray-700">
-        <li><a href="/" class="hover:text-red-500">Home</a></li>
-        <li><a href="/about" class="hover:text-red-500">About</a></li>
-        <li><a href="/contact" class="hover:text-red-500">Contact</a></li>
-        <li><a href="/form" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">Predict</a></li>
-      </ul>
+        <a href="/" class="text-5xl font-bold text-red-500 flex items-center">
+        <span class="mr-2">❤️</span>
+        HeartPredict
+        </a>
+        <ul class="flex space-x-6 text-gray-700">
+        <li><a href="/" class="hover:text-red-500 text-xl transition-colors duration-300">Home</a></li>
+        <li><a href="/about" class="hover:text-red-500 text-xl transition-colors duration-300">About</a></li>
+        <li><a href="/contact" class="hover:text-red-500 text-xl transition-colors duration-300">Contact</a></li>
+        <li><a href="/resources" class="hover:text-red-500 text-xl transition-colors duration-300">Resources</a></li>
+        <li><a href="/form" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors duration-300 text-2xl">Predict</a></li>
+        </ul>
     </div>
-  </nav>
-
+    </nav>
   <main class="flex-1 container mx-auto p-6">
     {% block content %}{% endblock %}
   </main>
@@ -55,11 +58,11 @@
       <div class="footer-col">
         <h3 class="text-lg font-semibold text-white mb-4">Quick Links</h3>
         <ul class="space-y-2">
-          <li><a href="#" class="hover:text-white transition">Home</a></li>
-          <li><a href="#" class="hover:text-white transition">About Us</a></li>
-          <li><a href="#" class="hover:text-white transition">Services</a></li>
-          <li><a href="#" class="hover:text-white transition">Portfolio</a></li>
-          <li><a href="#" class="hover:text-white transition">Blog</a></li>
+          <li><a href="/" class="hover:text-white transition">Home</a></li>
+          <li><a href="/about" class="hover:text-white transition">About Us</a></li>
+          <li><a href="/contact" class="hover:text-white transition">Contact</a></li>
+          <li><a href="/form" class="hover:text-white transition">Predict</a></li>
+          <li><a href="/resources" class="hover:text-white transition">Resources</a></li>
         </ul>
       </div>
       
@@ -85,15 +88,19 @@
           </li>
           <li class="flex items-center">
             <i class="fas fa-phone mr-3"></i>
-            <span>+1 (555) 123-4567</span>
+            <span>
+                <a href="tel:+2348066127153" class="hover:text-white transition">+234 8066127153</a>
+            </span>
           </li>
           <li class="flex items-center">
             <i class="fas fa-envelope mr-3"></i>
-            <span>info@brandname.com</span>
+            <span>
+                <a href="mailto:muftaudeenyusufbabatunde@gmail.com" class="hover:text-white transition">muftaudeenyusufbabatunde@gmail.com</a>
+            </span>
           </li>
           <li class="flex items-center">
             <i class="fas fa-clock mr-3"></i>
-            <span>Mon-Fri: 9AM - 6PM</span>
+            <span>Mon-Fri: 9AM - 10PM</span>
           </li>
         </ul>
       </div>

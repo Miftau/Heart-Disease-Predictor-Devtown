@@ -116,6 +116,10 @@ def about():
 def contact():
     return render_template('contact.html')
 
+@app.route('/resources')
+def resources():
+    return render_template('resources.html')
+
 @app.route("/form", methods=["GET"])
 def form():
     return render_template("form.html")

@@ -59,3 +59,147 @@
   </div>
 </body>
 </html>
+
+{% extends 'base.html' %}
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-r from-red-50 to-white py-16 border-b">
+  <div class="container mx-auto px-4">
+    <div class="max-w-3xl mx-auto text-center">
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Your Heart Health Assessment</h1>
+      <p class="text-xl text-gray-600 mb-6">
+        Understanding your cardiovascular risk factors
+      </p>
+      <div class="w-24 h-1 bg-red-500 rounded-full mx-auto"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Results Section -->
+<section class="py-16">
+  <div class="container mx-auto px-4">
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
+      <!-- Result Header -->
+      <div class="bg-gradient-to-r from-red-500 to-red-700 text-white p-8 text-center">
+        <h2 class="text-3xl font-bold mb-2">Assessment Results</h2>
+        <p class="text-red-100">Based on your provided health data</p>
+      </div>
+      
+      <!-- Result Content -->
+      {% if result %}
+      <!-- Dynamic Risk Display -->
+      {% set prob_percent = (prob * 100) | round(1) %}
+      {% if risk == "Low" %}
+        {% set bar_color = "bg-green-500" %}
+        {% set risk_color = "text-green-700 bg-green-100" %}
+      {% elif risk == "Medium" %}
+        {% set bar_color = "bg-yellow-500" %}
+        {% set risk_color = "text-yellow-700 bg-yellow-100" %}
+      {% else %}
+        {% set bar_color = "bg-red-500" %}
+        {% set risk_color = "text-red-700 bg-red-100" %}
+      {% endif %}
+
+      <div class="mb-6 p-5 border rounded-xl bg-gray-50 shadow-inner">
+        <h2 class="text-xl font-semibold mb-2 text-gray-800">{{ result }}</h2>
+        <p class="text-sm mb-3">Prediction Confidence:</p>
+        <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+          <div class="{{ bar_color }} h-4 rounded-full" style="width: {{ prob_percent }}%;"></div>
+        </div>
+        <div class="flex justify-between mt-1 text-sm text-gray-600">
+          <span>0%</span>
+          <span>{{ prob_percent }}%</span>
+          <span>100%</span>
+        </div>
+
+        <div class="mt-4">
+          <span class="inline-block px-3 py-1 text-sm font-semibold rounded-full {{ risk_color }}">
+            Risk Level: {{ risk }}
+          </span>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if tables %}
+      <div class="overflow-x-auto mb-4 border-t border-gray-100 pt-4">
+        {{ tables|safe }}
+      </div>
+    {% endif %}
+
+    <div class="flex justify-center gap-4 mt-6">
+      {% if download_link %}
+        <a href="{{ download_link }}" download class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">⬇️ Download CSV</a>
+      {% endif %}
+      <a href="/" class="inline-block bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded">🔙 Back</a>
+    </div>
+        
+        <!-- Important Notice -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-8">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <i class="fas fa-exclamation-triangle text-yellow-500 text-xl"></i>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-yellow-700">
+                <strong>Important:</strong> This assessment is not a substitute for professional medical advice. Always consult with a qualified healthcare provider before making any changes to your health regimen.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4">
+          <a href="/form" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-300">
+            Retake Assessment
+          </a>
+          <a href="/resources" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold py-3 px-6 rounded-lg text-center transition duration-300">
+            Heart Health Resources
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Resources Section -->
+<section class="py-16 bg-gray-50">
+  <div class="container mx-auto px-4">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Heart Health Resources</h2>
+      <p class="text-gray-600 max-w-2xl mx-auto">
+        Additional tools and information to support your cardiovascular health
+      </p>
+      <div class="w-24 h-1 bg-red-500 rounded-full mx-auto mt-4"></div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+          <i class="fas fa-heartbeat text-red-500 text-xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">Risk Factors Guide</h3>
+        <p class="text-gray-600 text-center mb-4">Understand the key factors that contribute to heart disease</p>
+        <a href="#" class="text-red-500 font-medium hover:underline text-center block">Learn More →</a>
+      </div>
+      
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+          <i class="fas fa-dumbbell text-red-500 text-xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">Exercise Plans</h3>
+        <p class="text-gray-600 text-center mb-4">Cardiovascular exercise routines for all fitness levels</p>
+        <a href="#" class="text-red-500 font-medium hover:underline text-center block">Get Started →</a>
+      </div>
+      
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+          <i class="fas fa-utensils text-red-500 text-xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2 text-center">Heart-Healthy Recipes</h3>
+        <p class="text-gray-600 text-center mb-4">Nutritious meals designed to support cardiovascular health</p>
+        <a href="https://www.nhlbi.nih.gov/health/heart-healthy-living/healthy-foods" class="text-red-500 font-medium hover:underline text-center block">View Recipes →</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
