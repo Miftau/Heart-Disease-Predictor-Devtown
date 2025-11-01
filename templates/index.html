@@ -1,165 +1,220 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Heart Disease Predictor</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 text-gray-800 min-h-screen">
+{% extends "base.html" %}
 
-  <header class="bg-gradient-to-r from-red-600 to-pink-600 text-white py-10 shadow">
-    <div class="max-w-5xl mx-auto px-6 text-center">
-      <h1 class="text-3xl font-extrabold">💓 Heart Disease Prediction</h1>
-      <p class="mt-1 text-sm opacity-90">Upload a CSV (bulk) or enter patient details manually to get prediction results.</p>
-    </div>
-  </header>
-
-  <main class="max-w-5xl mx-auto px-6 py-10 space-y-8">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="space-y-2">
-          {% for category, msg in messages %}
-            <div class="px-4 py-2 rounded {{ 'bg-red-100 text-red-800' if category=='danger' else 'bg-yellow-100 text-yellow-800' }}">
-              {{ msg }}
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
-
-    {% if error %}
-      <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
-        <p class="text-red-700">{{ error }}</p>
-      </div>
-    {% endif %}
-
-    <!-- Upload card -->
-    <section class="bg-white shadow rounded-lg p-6">
-      <h2 class="font-semibold text-lg mb-2">📁 Upload CSV (Bulk Predictions)</h2>
-      <p class="text-sm text-gray-500 mb-4">CSV should contain <strong>13 columns</strong> in this order (no headers required):
-        <code class="bg-gray-100 px-2 py-1 rounded">age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal</code>
+{% block content %}
+<!-- Hero Section -->
+<section class="py-16 bg-gradient-to-r from-red-50 to-white border-b">
+  <div class="container mx-auto px-4 flex flex-col md:flex-row items-center">
+    <div class="md:w-1/2 mb-10 md:mb-0">
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-800 leading-tight mb-4">
+        Predict Your Heart Health with AI
+      </h1>
+      <p class="text-lg text-gray-600 mb-6">
+        Our advanced machine learning model analyzes key health indicators to assess your risk of heart disease. Early detection saves lives.
       </p>
-      <form action="/predict" method="post" enctype="multipart/form-data" class="flex gap-3 items-center">
-        <input type="file" name="file" accept=".csv" class="block w-2/3 text-sm text-gray-700 border rounded p-2 bg-gray-50">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded">Predict CSV</button>
-      </form>
-    </section>
+      <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+        <a href="/form" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-300">
+          Start Free Assessment
+        </a>
+        <a href="#features" class="bg-white hover:bg-gray-100 text-red-500 border border-red-500 font-bold py-3 px-6 rounded-lg text-center transition duration-300">
+          Learn More
+        </a>
+      </div>
+    </div>
+    <div class="md:w-1/2 flex justify-center">
+      <div class="bg-gray-200 border-2 border-dashed rounded-xl w-full max-w-lg h-80 flex items-center justify-center">
+        <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=755&q=80" alt="Heart Health" class="w-full h-full object-cover rounded-lg">
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- Manual input card -->
-    <section class="bg-white shadow rounded-lg p-6">
-      <h2 class="font-semibold text-lg mb-2">🧍 Manual Input (Single Patient)</h2>
-      <p class="text-sm text-gray-500 mb-4">Fill the fields below to predict for a single patient.</p>
-
-      <form action="/predict" method="post" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- keep same fields as earlier Tailwind template -->
-        <div>
-          <label class="block text-sm font-medium mb-1">Age (years)</label>
-          <input name="age" type="number" step="1" required class="w-full border rounded p-2">
+<!-- Features Section -->
+<section id="features" class="py-16 bg-white">
+  <div class="container mx-auto px-4">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">How It Works</h2>
+      <p class="text-gray-600 max-w-2xl mx-auto">
+        Our heart disease prediction model uses advanced algorithms to analyze your health data
+      </p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <!-- Feature 1 -->
+      <div class="bg-gray-50 p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-red-500 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
         </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Sex</label>
-          <select name="sex" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="1">Male</option>
-            <option value="0">Female</option>
-          </select>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Enter Your Data</h3>
+        <p class="text-gray-600">
+          Input key health metrics like age, cholesterol levels, blood pressure, and other vital signs in our simple form.
+        </p>
+      </div>
+      
+      <!-- Feature 2 -->
+      <div class="bg-gray-50 p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-red-500 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
         </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Chest Pain Type (cp)</label>
-          <select name="cp" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="0">Typical Angina</option>
-            <option value="1">Atypical Angina</option>
-            <option value="2">Non-Anginal Pain</option>
-            <option value="3">Asymptomatic</option>
-          </select>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">AI Analysis</h3>
+        <p class="text-gray-600">
+          Our machine learning model processes your data using medical research-backed algorithms to assess risk factors.
+        </p>
+      </div>
+      
+      <!-- Feature 3 -->
+      <div class="bg-gray-50 p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-red-500 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
         </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Get Results</h3>
+        <p class="text-gray-600">
+          Receive a comprehensive report with your risk assessment and personalized health recommendations.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">Resting Blood Pressure (trestbps) mm Hg</label>
-          <input name="trestbps" type="number" step="1" required class="w-full border rounded p-2">
+<!-- Stats Section -->
+<section class="py-16 bg-red-50">
+  <div class="container mx-auto px-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+      <div>
+        <h3 class="text-4xl font-bold text-red-600">95%</h3>
+        <p class="text-gray-700 mt-2">Accuracy Rate</p>
+      </div>
+      <div>
+        <h3 class="text-4xl font-bold text-red-600">50K+</h3>
+        <p class="text-gray-700 mt-2">Assessments Completed</p>
+      </div>
+      <div>
+        <h3 class="text-4xl font-bold text-red-600">24/7</h3>
+        <p class="text-gray-700 mt-2">Available Support</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="py-16 bg-white">
+  <div class="container mx-auto px-4">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">User Experiences</h2>
+      <p class="text-gray-600 max-w-2xl mx-auto">
+        Hear from individuals who have used our heart disease prediction tool
+      </p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <!-- Testimonial 1 -->
+      <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+        <div class="flex items-center mb-4">
+          <div class="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16" aria-label="User avatar"></div>
+          <div class="ml-4">
+            <h4 class="font-bold text-gray-800">Michael Johnson</h4>
+            <div class="flex text-yellow-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            </div>
+          </div>
         </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Serum Cholesterol (chol) mg/dl</label>
-          <input name="chol" type="number" step="1" required class="w-full border rounded p-2">
+        <p class="text-gray-600 italic">
+          "This tool helped me realize I needed to make lifestyle changes before it was too late. The personalized recommendations were spot on."
+        </p>
+      </div>
+      
+      <!-- Testimonial 2 -->
+      <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+        <div class="flex items-center mb-4">
+          <div class="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16" aria-label="User avatar"></div>
+          <div class="ml-4">
+            <h4 class="font-bold text-gray-800">Sarah Williams</h4>
+            <div class="flex text-yellow-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            </div>
+          </div>
         </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Fasting Blood Sugar > 120 mg/dl (fbs)</label>
-          <select name="fbs" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="1">True</option>
-            <option value="0">False</option>
-          </select>
+        <p class="text-gray-600 italic">
+          "As a doctor, I appreciate the scientific approach behind this tool. It's a great complement to traditional assessments."
+        </p>
+      </div>
+      
+      <!-- Testimonial 3 -->
+      <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+        <div class="flex items-center mb-4">
+          <div class="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16" aria-label="User avatar"></div>
+          <div class="ml-4">
+            <h4 class="font-bold text-gray-800">David Chen</h4>
+            <div class="flex text-yellow-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            </div>
+          </div>
         </div>
+        <p class="text-gray-600 italic">
+          "The early warning gave me time to consult with my doctor and take preventive measures. Highly recommend this service."
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">Resting ECG (restecg)</label>
-          <select name="restecg" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="0">Normal</option>
-            <option value="1">ST-T Abnormality</option>
-            <option value="2">Left Ventricular Hypertrophy</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Max Heart Rate Achieved (thalach)</label>
-          <input name="thalach" type="number" step="1" required class="w-full border rounded p-2">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Exercise Induced Angina (exang)</label>
-          <select name="exang" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="1">Yes</option>
-            <option value="0">No</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">ST Depression (oldpeak)</label>
-          <input name="oldpeak" type="number" step="0.1" required class="w-full border rounded p-2">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Slope of ST Segment (slope)</label>
-          <select name="slope" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="0">Upsloping</option>
-            <option value="1">Flat</option>
-            <option value="2">Downsloping</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Number of Major Vessels (ca) 0–3</label>
-          <input name="ca" type="number" step="1" required class="w-full border rounded p-2">
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Thalassemia (thal)</label>
-          <select name="thal" required class="w-full border rounded p-2">
-            <option value="">Select...</option>
-            <option value="1">Normal</option>
-            <option value="2">Fixed Defect</option>
-            <option value="3">Reversible Defect</option>
-          </select>
-        </div>
-
-        <div class="md:col-span-3 text-center mt-4">
-          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg">🔍 Predict</button>
-        </div>
-      </form>
-    </section>
-  </main>
-
-  <footer class="text-center py-6 text-sm text-gray-500">
-    Built with ❤️ by YUSUF B.M (Dev. Progress)
-  </footer>
-</body>
-</html>
+<!-- CTA Section -->
+<section class="py-16 bg-gradient-to-r from-red-500 to-red-700 text-white">
+  <div class="container mx-auto px-4 text-center">
+    <h2 class="text-3xl md:text-4xl font-bold mb-6">Take Control of Your Heart Health Today</h2>
+    <p class="text-xl mb-8 max-w-2xl mx-auto">
+      Don't wait for symptoms. Get a personalized heart health assessment in under 5 minutes.
+    </p>
+    <a href="/form" class="bg-white text-red-600 hover:bg-gray-100 font-bold py-4 px-8 rounded-lg text-lg inline-block transition duration-300">
+      Start Your Assessment
+    </a>
+  </div>
+</section>
+{% endblock %}

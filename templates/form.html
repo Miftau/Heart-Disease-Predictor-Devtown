@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block content %}
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+  <header class="bg-gradient-to-r from-red-600 to-pink-600 text-white py-10 shadow">
+    <div class="max-w-5xl mx-auto px-6 text-center">
+      <h1 class="text-3xl font-extrabold">💓 Heart Disease Prediction</h1>
+      <p class="mt-1 text-sm opacity-90">Upload a CSV (bulk) or enter patient details manually to get prediction results.</p>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-10 space-y-8">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2">
+          {% for category, msg in messages %}
+            <div class="px-4 py-2 rounded {{ 'bg-red-100 text-red-800' if category=='danger' else 'bg-yellow-100 text-yellow-800' }}">
+              {{ msg }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if error %}
+      <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+        <p class="text-red-700">{{ error }}</p>
+      </div>
+    {% endif %}
+
+    <!-- Upload card -->
+    <section class="bg-white shadow rounded-lg p-6">
+      <h2 class="font-semibold text-lg mb-2">📁 Upload CSV (Bulk Predictions)</h2>
+      <p class="text-sm text-gray-500 mb-4">CSV should contain <strong>13 columns</strong> in this order (no headers required):
+        <code class="bg-gray-100 px-2 py-1 rounded">age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal</code>
+      </p>
+      <form action="/predict" method="post" enctype="multipart/form-data" class="flex gap-3 items-center">
+        <input type="file" name="file" accept=".csv" class="block w-2/3 text-sm text-gray-700 border rounded p-2 bg-gray-50">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded">Predict CSV</button>
+      </form>
+    </section>
+
+    <!-- Manual input card -->
+    <section class="bg-white shadow rounded-lg p-6">
+      <h2 class="font-semibold text-lg mb-2">🧍 Manual Input (Single Patient)</h2>
+      <p class="text-sm text-gray-500 mb-4">Fill the fields below to predict for a single patient.</p>
+
+      <form action="/predict" method="post" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- keep same fields as earlier Tailwind template -->
+        <div>
+          <label class="block text-sm font-medium mb-1">Age (years)</label>
+          <input name="age" type="number" step="1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Sex</label>
+          <select name="sex" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="1">Male</option>
+            <option value="0">Female</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Chest Pain Type (cp)</label>
+          <select name="cp" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="0">Typical Angina</option>
+            <option value="1">Atypical Angina</option>
+            <option value="2">Non-Anginal Pain</option>
+            <option value="3">Asymptomatic</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Resting Blood Pressure (trestbps) mm Hg</label>
+          <input name="trestbps" type="number" step="1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Serum Cholesterol (chol) mg/dl</label>
+          <input name="chol" type="number" step="1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Fasting Blood Sugar > 120 mg/dl (fbs)</label>
+          <select name="fbs" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="1">True</option>
+            <option value="0">False</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Resting ECG (restecg)</label>
+          <select name="restecg" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="0">Normal</option>
+            <option value="1">ST-T Abnormality</option>
+            <option value="2">Left Ventricular Hypertrophy</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Max Heart Rate Achieved (thalach)</label>
+          <input name="thalach" type="number" step="1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Exercise Induced Angina (exang)</label>
+          <select name="exang" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="1">Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">ST Depression (oldpeak)</label>
+          <input name="oldpeak" type="number" step="0.1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Slope of ST Segment (slope)</label>
+          <select name="slope" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="0">Upsloping</option>
+            <option value="1">Flat</option>
+            <option value="2">Downsloping</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Number of Major Vessels (ca) 0–3</label>
+          <input name="ca" type="number" step="1" required class="w-full border rounded p-2">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Thalassemia (thal)</label>
+          <select name="thal" required class="w-full border rounded p-2">
+            <option value="">Select...</option>
+            <option value="1">Normal</option>
+            <option value="2">Fixed Defect</option>
+            <option value="3">Reversible Defect</option>
+          </select>
+        </div>
+
+        <div class="md:col-span-3 text-center mt-4">
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg">🔍 Predict</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+{% endblock %}
+
