@@ -6,3 +6,5 @@ joblib~=1.5.0
 scikit-learn
 flask
 gunicorn
+Flask-Mail
+python-dotenv

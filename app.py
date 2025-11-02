@@ -6,92 +6,161 @@ from flask import Flask, render_template, request, redirect, url_for, send_from_
 import pandas as pd
 import numpy as np
 import joblib
+from flask_mail import Mail, Message
+from dotenv import load_dotenv
 
+# Load environment variables (if .env present)
+load_dotenv()
 
+# -------------------------
 # CONFIG
-MODEL_FILE = "heart_rf_model.pkl"      # trained RandomForest model
-SCALER_FILE = "heart_scaler.pkl"       # fitted StandardScaler
-TEMPLATE_FILE = "heart_user_template.csv"  # contains X.columns 
+# -------------------------
+# Model files - ensure these exist
+CLINICAL_MODEL_FILE = "heart_rf_clinical.pkl"
+CLINICAL_SCALER_FILE = "heart_scaler_clinical.pkl"
+CLINICAL_TEMPLATE_FILE = "heart_user_template_clinical.csv"
+
+LIFESTYLE_MODEL_FILE = "heart_rf_lifestyle.pkl"
+LIFESTYLE_SCALER_FILE = "heart_scaler_lifestyle.pkl"
+LIFESTYLE_TEMPLATE_FILE = "heart_user_template_lifestyle.csv"
+
 RESULTS_DIR = os.path.join("static", "results")
-BASE_COLUMNS = [
-    "age","sex","cp","trestbps","chol","fbs","restecg",
-    "thalach","exang","oldpeak","slope","ca","thal"
-]
-static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# Base columns for forms (clinical = the 13 input cols used previously)
+BASE_COLUMNS_CLINICAL = [
+    "age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
+    "thalach", "exang", "oldpeak", "slope", "ca", "thal"
+]
+
+# Lifestyle columns according to your cardio_train.csv (without id and target)
+# Provided earlier: id;age;gender;height;weight;ap_hi;ap_lo;cholesterol;gluc;smoke;alco;active;cardio
+BASE_COLUMNS_LIFESTYLE = [
+    "age", "gender", "height", "weight", "ap_hi", "ap_lo",
+    "cholesterol", "gluc", "smoke", "alco", "active"
+]
+
+# Flask app
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret")  # change in prod
+app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
+# === Flask-Mail Configuration ===
+app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", 587))
+app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "True") == "True"
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_DEFAULT_SENDER"] = (os.getenv("MAIL_SENDER_NAME", "HeartPredict Contact"), os.getenv("MAIL_USERNAME"))
 
-# Load model, scaler, and feature columns
-if not (os.path.exists(MODEL_FILE) and os.path.exists(SCALER_FILE) and os.path.exists(TEMPLATE_FILE)):
-    raise FileNotFoundError("Make sure heart_rf_model.pkl, heart_scaler.pkl and heart_user_template.csv exist in the app folder.")
+mail = Mail(app)
 
-model = joblib.load(MODEL_FILE)
-scaler = joblib.load(SCALER_FILE)
+@app.context_processor
+def inject_now():
+    """Add current year to all templates."""
+    return {"current_year": datetime.now().year}
 
-# Read template to get feature columns (one-hot encoded)
-template_df = pd.read_csv(TEMPLATE_FILE)
-FEATURE_COLUMNS = template_df.columns.tolist()   # final columns used by model
+# -------------------------
+# Load models & templates
+# -------------------------
+missing = []
+for path in [CLINICAL_MODEL_FILE, CLINICAL_SCALER_FILE, CLINICAL_TEMPLATE_FILE,
+             LIFESTYLE_MODEL_FILE, LIFESTYLE_SCALER_FILE, LIFESTYLE_TEMPLATE_FILE]:
+    if not os.path.exists(path):
+        missing.append(path)
 
-def prepare_and_predict(df_raw):
+if missing:
+    raise FileNotFoundError(f"Missing required model/template files: {missing}")
+
+# Load clinical model + scaler + feature columns (these are one-hot encoded columns)
+clinical_model = joblib.load(CLINICAL_MODEL_FILE)
+clinical_scaler = joblib.load(CLINICAL_SCALER_FILE)
+clinical_template_df = pd.read_csv(CLINICAL_TEMPLATE_FILE)
+CLINICAL_FEATURE_COLUMNS = clinical_template_df.columns.tolist()
+
+# Load lifestyle model + scaler + feature columns (likely raw numeric columns)
+lifestyle_model = joblib.load(LIFESTYLE_MODEL_FILE)
+lifestyle_scaler = joblib.load(LIFESTYLE_SCALER_FILE)
+lifestyle_template_df = pd.read_csv(LIFESTYLE_TEMPLATE_FILE)
+LIFESTYLE_FEATURE_COLUMNS = lifestyle_template_df.columns.tolist()
+
+# -------------------------
+# Helper: prepare and predict
+# -------------------------
+def prepare_and_predict(df_raw: pd.DataFrame, model_type: str):
     """
-    Takes a dataframe with base columns (or many columns),
-    returns (df_with_predictions, saveable_df)
-    - df_with_predictions: df including 'Prediction', 'Prob_Pos', 'Risk_Level'
+    Preprocess input dataframe and predict using the selected model_type ('clinical'|'lifestyle').
+    Returns: out_df (original input fields + Prediction, Prob_Pos (0-1), Risk_Level)
     """
-    # If df_raw has 14 columns (no headers in original data), assign base + num
-    if df_raw.shape[1] == 14 and all(isinstance(c, int) for c in df_raw.columns):
-        df_raw.columns = BASE_COLUMNS + ["num"]
-    # If df_raw has 13 columns with integer column names -> assign base columns
-    elif df_raw.shape[1] == 13 and all(isinstance(c, int) for c in df_raw.columns):
-        df_raw.columns = BASE_COLUMNS
+    if model_type not in ("clinical", "lifestyle"):
+        raise ValueError("model_type must be 'clinical' or 'lifestyle'")
 
-    # If uploaded CSV contains extra columns, try to keep the base columns
-    if not set(BASE_COLUMNS).issubset(set(df_raw.columns)):
-        # attempt to infer by position if no matching names
-        if df_raw.shape[1] >= 13 and all(isinstance(c, int) for c in df_raw.columns):
-            df_raw = df_raw.iloc[:, :13]
-            df_raw.columns = BASE_COLUMNS
+    # Work on a copy
+    df = df_raw.copy()
+
+    # If headerless CSV gives integer column names, use positional mapping
+    if all(isinstance(c, int) for c in df.columns):
+        if model_type == "clinical":
+            # clinical expects 13 input cols (no target), or 14 with target
+            if df.shape[1] >= 13:
+                df = df.iloc[:, :13]
+                df.columns = BASE_COLUMNS_CLINICAL
         else:
-            # If columns exist but different names, try to rename heuristically (not foolproof)
-            flash("Uploaded CSV doesn't contain the expected columns. Ensure file has 13 input columns (order: age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal) or includes headers named accordingly.", "warning")
+            # lifestyle expects 11 input columns (age..active)
+            if df.shape[1] >= len(BASE_COLUMNS_LIFESTYLE):
+                df = df.iloc[:, :len(BASE_COLUMNS_LIFESTYLE)]
+                df.columns = BASE_COLUMNS_LIFESTYLE
 
     # Keep original for output
-    df_input = df_raw.copy()
+    out_input = df.copy()
 
-    # Only keep base columns (if other columns exist)
-    df_input = df_input.loc[:, [c for c in BASE_COLUMNS if c in df_input.columns]]
+    if model_type == "clinical":
+        # Keep only base clinical columns
+        df = df.loc[:, [c for c in BASE_COLUMNS_CLINICAL if c in df.columns]]
 
-    # One-hot encode categorical fields, then align with FEATURE_COLUMNS
-    df_encoded = pd.get_dummies(df_input, columns=df_input.select_dtypes(include=['object','category']).columns.tolist())
-    df_encoded = df_encoded.reindex(columns=FEATURE_COLUMNS, fill_value=0)
+        # One-hot encode categorical cols (if any) then align with CLINICAL_FEATURE_COLUMNS
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        df_encoded = pd.get_dummies(df, columns=cat_cols)
+        df_encoded = df_encoded.reindex(columns=CLINICAL_FEATURE_COLUMNS, fill_value=0)
 
-    # Scale numeric features (scaler expects numeric array)
-    X_scaled = scaler.transform(df_encoded.values)
+        # Scale
+        X = clinical_scaler.transform(df_encoded.values)
+        model = clinical_model
 
-    # Predict probabilities and class
+    else:  # lifestyle
+        # Keep only lifestyle base cols
+        df = df.loc[:, [c for c in BASE_COLUMNS_LIFESTYLE if c in df.columns]]
+
+        # Ensure numeric, coerce errors to NaN then fill with column mean
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        df = df.fillna(df.mean(numeric_only=True))
+
+        # Reindex to match LIFESTYLE_FEATURE_COLUMNS (which should be numeric feature columns)
+        df_reindexed = df.reindex(columns=LIFESTYLE_FEATURE_COLUMNS, fill_value=0)
+        df_encoded = df_reindexed  # no one-hot here (assuming lifestyle model trained on numeric features)
+
+        # Scale
+        X = lifestyle_scaler.transform(df_encoded.values)
+        model = lifestyle_model
+
+    # Predict probabilities and classes
     if hasattr(model, "predict_proba"):
-        probs = model.predict_proba(X_scaled)[:, 1]  # probability of positive class
+        probs = model.predict_proba(X)[:, 1]
     else:
-        # fallback: use decision_function or predict (not as good)
         try:
-            probs = model.decision_function(X_scaled)
-            # convert to 0-1 via sigmoid
-            probs = 1 / (1 + np.exp(-probs))
+            df_dec = model.decision_function(X)
+            probs = 1 / (1 + np.exp(-df_dec))
         except Exception:
-            probs = model.predict(X_scaled)
+            probs = model.predict(X)
 
-    preds = model.predict(X_scaled)
+    preds = model.predict(X)
 
-    # create output dataframe (original columns + prediction info)
-    out_df = df_input.copy()
+    # Build output dataframe
+    out_df = out_input.copy()
     out_df["Prediction"] = preds
     out_df["Prob_Pos"] = np.round(probs, 4)
 
-    # Risk level mapping
     def risk_level(p):
         if p >= 0.66:
             return "High"
@@ -101,9 +170,11 @@ def prepare_and_predict(df_raw):
             return "Low"
 
     out_df["Risk_Level"] = out_df["Prob_Pos"].apply(risk_level)
-
     return out_df
 
+# -------------------------
+# Routes
+# -------------------------
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -112,83 +183,167 @@ def index():
 def about():
     return render_template('about.html')
 
-@app.route('/contact')
+@app.route("/contact", methods=["GET", "POST"])
 def contact():
-    return render_template('contact.html')
+    if request.method == "POST":
+        name = request.form.get("name")
+        email = request.form.get("email")
+        subject = request.form.get("subject")
+        message = request.form.get("message")
+
+        if not name or not email or not message:
+            flash("Please fill in all fields.", "danger")
+            return redirect(url_for("contact"))
+
+        try:
+            msg = Message(
+                subject=f"New Contact Form Message from {name}",
+                recipients=[os.getenv("MAIL_DEFAULT_RECEIVER")],
+                body=f"""
+You have received a new message from your website contact form.
+
+Name: {name}
+Email: {email}
+Subject: {subject}
+
+Message:
+{message}
+"""
+            )
+            mail.send(msg)
+            flash("Your message has been sent successfully!", "success")
+        except Exception as e:
+            flash(f"Error sending message: {str(e)}", "danger")
+
+        return redirect(url_for("contact"))
+
+    return render_template("contact.html")
 
 @app.route('/resources')
 def resources():
     return render_template('resources.html')
 
-@app.route("/form", methods=["GET"])
+@app.route("/form")
 def form():
-    return render_template("form.html")
+    return render_template(
+        "form.html",
+        BASE_COLUMNS_CLINICAL=BASE_COLUMNS_CLINICAL,
+        BASE_COLUMNS_LIFESTYLE=BASE_COLUMNS_LIFESTYLE
+    )
 
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
+        # Accept common frontend model names and map them to internal names
+        raw_model_type = (request.form.get("model_type") or request.args.get("model_type") or "clinical").lower().strip()
+        model_map = {
+            "heart": "clinical",
+            "clinical": "clinical",
+            "cardio": "lifestyle",
+            "lifestyle": "lifestyle"
+        }
+        model_type = model_map.get(raw_model_type, None)
+
+        if model_type is None:
+            flash("Invalid model selection. Choose 'Clinical' or 'Lifestyle'.", "danger")
+            return redirect(url_for("form"))
+
+        print(f"[INFO] Prediction requested. Model type (raw): {raw_model_type} → mapped: {model_type}")
+
         # Case A: CSV upload
         uploaded_file = request.files.get("file")
         if uploaded_file and uploaded_file.filename != "":
-            # Read CSV. Let pandas infer header. If headerless, columns are numeric indices.
+            # Read CSV (start with headerless read)
+            uploaded_file.stream.seek(0)
             df = pd.read_csv(uploaded_file, header=None)
-            # If user included header row intentionally, try to detect - simple heuristic:
-            # if header row values are strings and not numeric, re-read with header=0
-            header_candidate = pd.read_csv(uploaded_file, nrows=1)
-            # but uploaded_file is consumed; re-read from beginning
+
+            # try to detect headerful CSV
             uploaded_file.stream.seek(0)
             try:
-                # attempt read with header infer
                 df_try = pd.read_csv(uploaded_file)
-                # Heuristic: if df_try has 13 or 14 columns and first row values are not numeric, assume header present
+                uploaded_file.stream.seek(0)
+                # If df_try has enough numeric columns, prefer it
                 numeric_count = df_try.dtypes.apply(lambda x: np.issubdtype(x, np.number)).sum()
-                if df_try.shape[1] >= 13 and numeric_count >= 5:
+                if df_try.shape[1] >= 5 and numeric_count >= 3:
                     df = df_try
                 else:
-                    # keep original no-header df already read
                     uploaded_file.stream.seek(0)
                     df = pd.read_csv(uploaded_file, header=None)
             except Exception:
                 uploaded_file.stream.seek(0)
                 df = pd.read_csv(uploaded_file, header=None)
 
-            results_df = prepare_and_predict(df)
+            results_df = prepare_and_predict(df, model_type=model_type)
 
-            # Save CSV with timestamp + uuid
-            fname = f"pred_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}.csv"
+            # Save results with model name
+            fname = f"pred_{model_type}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}.csv"
             save_path = os.path.join(RESULTS_DIR, fname)
             results_df.to_csv(save_path, index=False)
 
             download_url = url_for("static", filename=f"results/{fname}")
-            # render result page (table + download link)
-            return render_template("result.html", tables=[results_df.to_html(classes="table-auto w-full text-sm", index=False, justify="center")], download_link=download_url)
+            return render_template("result.html",
+                                   tables=[results_df.to_html(classes="table-auto w-full text-sm", index=False)],
+                                   download_link=download_url,
+                                   model_type=model_type)
 
+        # Case B: Manual form input
         else:
             missing = []
             data = {}
-            for col in BASE_COLUMNS:
-                val = request.form.get(col)
+            # pick proper base columns
+            base_cols = BASE_COLUMNS_CLINICAL if model_type == "clinical" else BASE_COLUMNS_LIFESTYLE
+
+            # map 'sex' -> 'gender' for lifestyle if user uses 'sex' in form
+            for col in base_cols:
+                # prefer form keys: direct name, but allow aliases
+                val = None
+                if col in request.form:
+                    val = request.form.get(col)
+                else:
+                    # alias handling:
+                    if col == "gender" and "sex" in request.form:
+                        val = request.form.get("sex")
+                    # sometimes frontend uses 'alco' vs 'alcohol'
+                    elif col == "alco" and "alcohol" in request.form:
+                        val = request.form.get("alcohol")
+                    elif col == "smoke" and "smoking" in request.form:
+                        val = request.form.get("smoking")
+                    else:
+                        val = request.form.get(col)
+
                 if val is None or val == "":
                     missing.append(col)
                 else:
-                    data[col] = float(val)
-            if missing:
-                flash(f"Missing inputs for: {', '.join(missing)}. Please fill all fields.", "danger")
-                return redirect(url_for("index"))
+                    # Coerce numeric types where possible, but keep strings for categorical
+                    try:
+                        data[col] = float(val)
+                    except Exception:
+                        data[col] = val
 
-            user_df = pd.DataFrame([data], columns=BASE_COLUMNS)
-            results_df = prepare_and_predict(user_df)
+            if missing:
+                # Give helpful message listing which inputs were missing for selected model
+                flash(f"Missing inputs for model '{model_type}': {', '.join(missing)}. Please fill all required fields.", "danger")
+                return redirect(url_for("form"))
+
+            # Build dataframe and predict
+            user_df = pd.DataFrame([data], columns=base_cols)
+            results_df = prepare_and_predict(user_df, model_type=model_type)
 
             # Save single-result CSV
-            fname = f"pred_manual_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}.csv"
+            fname = f"pred_manual_{model_type}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}.csv"
             save_path = os.path.join(RESULTS_DIR, fname)
             results_df.to_csv(save_path, index=False)
             download_url = url_for("static", filename=f"results/{fname}")
 
-            # For single-record, show summary result (result string) and table
             single = results_df.iloc[0]
-            readable_result = "No Heart Disease Detected" if single["Prediction"] == 0 else "Heart Disease Detected"
-            prob = single["Prob_Pos"]
+            readable_result = None
+            if model_type == "clinical":
+                readable_result = "No Heart Disease Detected" if single["Prediction"] == 0 else "Heart Disease Detected"
+            else:
+                # lifestyle model target is 'cardio' — use more generic phrasing
+                readable_result = "Low Cardiovascular Risk" if single["Prediction"] == 0 else "Elevated Cardiovascular Risk"
+
+            prob = float(single["Prob_Pos"])
             risk = single["Risk_Level"]
 
             return render_template("result.html",
@@ -196,19 +351,28 @@ def predict():
                                    prob=prob,
                                    risk=risk,
                                    tables=[results_df.to_html(classes="table-auto w-full text-sm", index=False)],
-                                   download_link=download_url)
+                                   download_link=download_url,
+                                   model_type=model_type)
     except Exception as e:
-        # Safe error message
-        return render_template("index.html", error=f"Error processing request: {str(e)}")
-    
+        # Log error in server logs (optional print)
+        print("Error during prediction:", str(e))
+        # show the form with an error message
+        flash(f"Error processing request: {str(e)}", "danger")
+        return redirect(url_for("form"))
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
 @app.route("/download/<path:filename>")
 def download_file(filename):
-    # optional: if you want a custom route for downloads
     return send_from_directory(RESULTS_DIR, filename, as_attachment=True)
 
+# Optional health endpoint for uptime monitors
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Note: consider using gunicorn for production
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
