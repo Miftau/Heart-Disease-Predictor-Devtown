@@ -1,134 +1,240 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <title>{{ title or "CardioGuard" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="preload" href="https://assets.mixkit.co/sfx/preview/mixkit-heartbeat-747.mp3" as="audio">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- AOS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+  <!-- Favicon -->
   <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2966/2966488.png">
 
-    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
-  <script>
-    AOS.init({
-      once: true,
-      duration: 800,
-      easing: 'ease-out-cubic'
-    });
+  <!-- Preload heartbeat sound (optional) -->
+  <link rel="preload" href="https://assets.mixkit.co/sfx/preview/mixkit-heartbeat-747.mp3" as="audio">
 
-    // Smooth scroll for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        document.querySelector(this.getAttribute('href')).scrollIntoView({
-          behavior: 'smooth'
-        });
+  <!-- ---------------------------------------------------- -->
+  <!--  DARK MODE & NAVBAR JS (only one copy)               -->
+  <!-- ---------------------------------------------------- -->
+  <script>
+    // ---- 1. Dark-mode init -------------------------------------------------
+    document.addEventListener('DOMContentLoaded', () => {
+      const html = document.documentElement;
+      const toggle = document.getElementById('dark-mode-toggle');
+      const sun = toggle?.querySelector('.sun');
+      const moon = toggle?.querySelector('.moon');
+
+      // Apply saved preference
+      const saved = localStorage.getItem('darkMode');
+      if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        html.classList.add('dark');
+        sun?.classList.add('hidden');
+        moon?.classList.remove('hidden');
+      } else {
+        sun?.classList.remove('hidden');
+        moon?.classList.add('hidden');
+      }
+
+      // Toggle handler
+      toggle?.addEventListener('click', () => {
+        html.classList.toggle('dark');
+        const isDark = html.classList.contains('dark');
+        localStorage.setItem('darkMode', isDark ? 'dark' : 'light');
+        sun?.classList.toggle('hidden', isDark);
+        moon?.classList.toggle('hidden', !isDark);
       });
+
+      // ---- 2. Navbar --------------------------------------------------------
+      const menu = document.getElementById('mobile-menu');
+      const btn  = document.getElementById('mobile-menu-toggle');
+      const icon = document.getElementById('menu-icon');
+
+      // Show/hide based on breakpoint
+      const handleResize = () => {
+        if (window.innerWidth >= 640) {                 // sm: breakpoint
+          menu.classList.remove('hidden');
+          btn.classList.add('hidden');
+          icon.classList.remove('fa-times'); icon.classList.add('fa-bars');
+        } else {
+          menu.classList.add('hidden');
+          btn.classList.remove('hidden');
+        }
+      };
+      handleResize();
+      window.addEventListener('resize', handleResize);
+
+      // Toggle on button click
+      btn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+        icon.classList.toggle('fa-bars');
+        icon.classList.toggle('fa-times');
+      });
+
+      // Close when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!menu.classList.contains('hidden') &&
+            !menu.contains(e.target) &&
+            !btn.contains(e.target)) {
+          menu.classList.add('hidden');
+          icon.classList.remove('fa-times'); icon.classList.add('fa-bars');
+        }
+      });
+
+      // ---- 3. AOS init ------------------------------------------------------
+      AOS.init({ once: true, duration: 800, easing: 'ease-out-cubic' });
     });
   </script>
 
+  <!-- ---------------------------------------------------- -->
+  <!--  STYLES (dark-mode, animations, mobile menu)        -->
+  <!-- ---------------------------------------------------- -->
   <style>
+    /* Dark-mode basics */
+    .dark { @apply bg-gray-900 text-gray-100; }
+    .dark .bg-white { @apply bg-gray-800; }
+    .dark .text-gray-800 { @apply text-gray-200; }
+    .dark .bg-gray-50 { @apply bg-gray-900; }
+    .dark .shadow-lg { @apply shadow-gray-700; }
+    .dark .border-gray-800 { @apply border-gray-700; }
+
+    /* Hide when Alpine would use x-cloak */
     [x-cloak] { display: none !important; }
+
+    html, body { overflow-x: hidden; }
+
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .animate-fade-in {
-      animation: fade-in 1s ease-out forwards;
-    }
-  </style>
+    .animate-fade-in { animation: fade-in 1s ease-out forwards; }
 
-  <!-- Alpine.js for reactive toggles -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>
-    /* Custom pulse for hero heart */
     @keyframes pulse-heart {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.15); }
+      0%,100% { transform: scale(1); }
+      50%     { transform: scale(1.15); }
     }
-    .animate-pulse-heart {
-      animation: pulse-heart 2s infinite ease-in-out;
+    .animate-pulse-heart { animation: pulse-heart 2s infinite ease-in-out; }
+
+    /* Mobile menu slide-down */
+    #mobile-menu {
+      transition: max-height .3s ease, padding .3s ease;
+      max-height: 0;
+      overflow: hidden;
+      background: inherit;
     }
+    #mobile-menu:not(.hidden) {
+      max-height: 600px;   /* enough for all items */
+      padding: 1rem 0;
+    }
+    @media (min-width: 640px) {
+      #mobile-menu { max-height: none !important; padding: 0 !important; }
+    }
+
+    /* Active link highlight */
+    .nav-active {
+      @apply text-red-500 font-semibold;
+    }
+    .dark .nav-active { @apply text-red-400; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen overflow-x-hidden flex flex-col" x-data="{ menuOpen: false }">
 
-  <nav x-data="{ menuOpen: false }" @keydown.escape="menuOpen = false"
-     class="bg-white shadow-lg py-4 sticky top-0 z-50 transition-all duration-300">
-  <div class="container mx-auto flex flex-wrap justify-between items-center px-4 sm:px-6">
-    <a href="/" class="text-2xl sm:text-5xl font-bold text-red-500 flex items-center">
-      <span class="mr-2 animate-pulse-heart">❤️</span>
-      CardioGuard
-    </a>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col transition-colors duration-300">
 
-    <!-- Mobile menu button -->
-    <button @click="menuOpen = !menuOpen"
-            class="sm:hidden text-gray-700 focus:outline-none"
-            aria-label="Toggle menu"
-            :aria-expanded="menuOpen.toString()">
-      <i :class="menuOpen ? 'fas fa-times' : 'fas fa-bars'"
-         class="text-2xl transition-transform duration-300"></i>
-    </button>
+  <!-- ==================== NAVBAR ==================== -->
+  <nav class="bg-white shadow-lg py-4 sticky top-0 z-50 transition-all duration-300">
+    <div class="container mx-auto flex justify-between items-center px-4 sm:px-6">
 
-    <!-- Nav links -->
-    <!-- On small screens we use x-show; on sm+ we show via sm:flex -->
-    <ul x-cloak x-show="menuOpen" x-transition
-        @click.away="menuOpen = false"
-        class="sm:flex flex-col sm:flex-row sm:space-x-6 w-full sm:w-auto mt-4 sm:mt-0 space-y-4 sm:space-y-0 text-gray-700 bg-white sm:bg-transparent">
-      <li><a href="/" class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 hover:translate-x-1">Home</a></li>
-      <li><a href="/about" class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 hover:translate-x-1">About</a></li>
-      <li><a href="/contact" class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 hover:translate-x-1">Contact</a></li>
-      <li><a href="/resources" class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 hover:translate-x-1">Resources</a></li>
-      <li>
-        <a href="/form"
-           class="block bg-red-500 text-white px-3 py-2 rounded-full hover:bg-red-600 hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-md sm:text-2xl text-center font-semibold">
-          Predict Now
-        </a>
-      </li>
-    </ul>
-  </div>
-</nav>
+      <!-- Logo -->
+      <a href="/" class="text-2xl sm:text-4xl font-bold text-red-500 flex items-center">
+        <span class="mr-2 animate-pulse-heart">❤️</span> CardioGuard
+      </a>
+
+      <!-- Dark-mode toggle (visible on all sizes) -->
+      <button id="dark-mode-toggle"
+              class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Toggle dark mode">
+        <i class="fas fa-sun sun text-yellow-500 text-xl"></i>
+        <i class="fas fa-moon moon hidden text-indigo-400 text-xl"></i>
+      </button>
+
+      <!-- Mobile hamburger (sm:hidden) -->
+      <button id="mobile-menu-toggle"
+              class="sm:hidden text-gray-700 focus:outline-none z-50"
+              aria-label="Toggle menu">
+        <i id="menu-icon" class="fas fa-bars text-2xl transition-transform duration-300"></i>
+      </button>
+
+      <!-- Navigation links -->
+      <ul id="mobile-menu"
+          class="hidden flex-col w-full mt-4 space-y-4 text-gray-700 bg-white absolute top-full left-0 shadow-lg sm:shadow-none sm:flex sm:flex-row sm:space-x-6 sm:w-auto sm:mt-0 sm:space-y-0 sm:bg-transparent sm:static sm:block">
+
+        {% macro nav_item(url, label) %}
+          <li>
+            <a href="{{ url }}"
+               class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 px-4 py-2 sm:p-0
+                      {% if request.path == url %}nav-active{% endif %}">
+              {{ label }}
+            </a>
+          </li>
+        {% endmacro %}
+
+        {{ nav_item('/', 'Home') }}
+        {{ nav_item('/about', 'About') }}
+        {{ nav_item('/contact', 'Contact') }}
+        {{ nav_item('/resources', 'Resources') }}
+
+        <li>
+          <a href="/form"
+             class="block bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-md sm:text-lg text-center font-semibold mx-4 sm:mx-0
+                    {% if request.path == '/form' %}nav-active bg-red-600{% endif %}">
+            Predict Now
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
   <main class="flex-1 container mx-auto p-4 sm:p-6">
-    <!-- Wrap all block content in AOS containers -->
-    <div data-aos="fade-up" data-aos-duration="800">
+    <div data-aos="fade-up">
       {% block content %}{% endblock %}
     </div>
   </main>
 
-  <!-- Footer -->
+<!-- Footer -->
   <footer class="bg-gray-900 text-gray-300 mt-auto">
     <div class="container mx-auto px-4 py-8 sm:py-12">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+
         <!-- Column 1 -->
         <div data-aos="fade-right" data-aos-delay="100">
           <h3 class="text-lg sm:text-xl font-bold text-white mb-4 flex items-center">
             <span class="mr-2 animate-pulse-heart">❤️</span> CardioGuard
           </h3>
-          <p class="mb-4 text-sm sm:text-base leading-relaxed">
-            CardioGuard is an AI-powered diagnostic tool designed to help healthcare professionals and individuals assess the likelihood of heart disease. By combining clinical parameters and modern data science, it transforms traditional diagnosis into fast, data-driven insights.
+          <p class="mb-4 text-base leading-relaxed">
+            CardioGuard is an AI-powered diagnostic tool designed to help healthcare professionals and individuals assess the likelihood of heart disease. By combining clinical parameters and data science, it delivers fast, data-driven insights.
           </p>
           <div class="flex space-x-4">
-            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300">
-              <i class="fab fa-facebook-f"></i>
-            </a>
-            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300">
-              <i class="fab fa-twitter"></i>
-            </a>
-            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300">
-              <i class="fab fa-instagram"></i>
-            </a>
-            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300">
-              <i class="fab fa-linkedin-in"></i>
-            </a>
+            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300"><i class="fab fa-facebook-f"></i></a>
+            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300"><i class="fab fa-twitter"></i></a>
+            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300"><i class="fab fa-instagram"></i></a>
+            <a href="#" class="text-gray-400 hover:text-white transform hover:scale-125 transition-all duration-300"><i class="fab fa-linkedin-in"></i></a>
           </div>
         </div>
 
         <!-- Column 2 -->
         <div data-aos="fade-up" data-aos-delay="200">
           <h3 class="text-lg font-semibold text-white mb-4">Quick Links</h3>
-          <ul class="space-y-2 text-sm sm:text-base">
+          <ul class="space-y-2 text-base">
             {% for link, text in [('/', 'Home'), ('/about', 'About Us'), ('/contact', 'Contact'), ('/form', 'Predict'), ('/resources', 'Resources')] %}
             <li>
               <a href="{{ link }}" class="hover:text-white transition-all duration-300 flex items-center group">
@@ -142,19 +248,19 @@
         <!-- Column 3 -->
         <div data-aos="fade-up" data-aos-delay="300">
           <h3 class="text-lg font-semibold text-white mb-4">Services</h3>
-          <ul class="space-y-2 text-sm sm:text-base">
-            <li><a href="#" class="hover:text-white transition-all duration-300 hover:translate-x-2">Remote Patient Monitoring</a></li>
-            <li><a href="#" class="hover:text-white transition-all duration-300 hover:translate-x-2">Telecardiology Consultations</a></li>
-            <li><a href="#" class="hover:text-white transition-all duration-300 hover:translate-x-2">Dietary Prescription</a></li>
-            <li><a href="#" class="hover:text-white transition-all duration-300 hover:translate-x-2">AI-Powered Exercise Partner</a></li>
-            <li><a href="#" class="hover:text-white transition-all duration-300 hover:translate-x-2">HealthTech</a></li>
+          <ul class="space-y-2 text-base">
+            <li><a href="#" class="hover:text-white transition-all duration-300">Remote Patient Monitoring</a></li>
+            <li><a href="#" class="hover:text-white transition-all duration-300">Telecardiology Consultations</a></li>
+            <li><a href="#" class="hover:text-white transition-all duration-300">Dietary Prescription</a></li>
+            <li><a href="#" class="hover:text-white transition-all duration-300">AI Exercise Partner</a></li>
+            <li><a href="#" class="hover:text-white transition-all duration-300">HealthTech</a></li>
           </ul>
         </div>
 
         <!-- Column 4 -->
         <div data-aos="fade-left" data-aos-delay="400">
           <h3 class="text-lg font-semibold text-white mb-4">Contact Us</h3>
-          <ul class="space-y-3 text-sm sm:text-base">
+          <ul class="space-y-3 text-base">
             <li class="flex items-start hover:text-white transition-all duration-300">
               <i class="fas fa-map-marker-alt mt-1 mr-3 text-red-500"></i>
               <span>BLK 4 Railway Compound, Ibadan.</span>
@@ -169,20 +275,17 @@
             </li>
             <li class="flex items-center hover:text-white transition-all duration-300">
               <i class="fas fa-clock mr-3 text-red-500"></i>
-              <span>Mon-Fri: 9AM - 10PM</span>
+              <span>Mon–Fri: 9AM – 10PM</span>
             </li>
           </ul>
         </div>
       </div>
 
-      <!-- Copyright -->
-      <div class="border-t border-gray-800 mt-12 pt-8 text-center text-sm animate-fade-in">
+      <div class="border-t border-gray-800 mt-12 pt-8 text-center text-base animate-fade-in">
         <p>&copy; 2025 CardioGuard. Built with <span class="text-red-500">❤️</span> by Team CardioGuard.</p>
       </div>
     </div>
   </footer>
-
-  <!-- AOS Init -->
 
 </body>
 </html>
