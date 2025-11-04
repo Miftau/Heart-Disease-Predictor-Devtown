@@ -129,7 +129,7 @@
       transition: max-height .3s ease, padding .3s ease;
       max-height: 0;
       overflow: hidden;
-      background: inherit;
+      background: white;
     }
     #mobile-menu:not(.hidden) {
       max-height: 600px;   /* enough for all items */
@@ -175,7 +175,7 @@
 
       <!-- Navigation links -->
       <ul id="mobile-menu"
-          class="hidden flex-col w-full mt-4 space-y-4 text-gray-700 bg-white absolute top-full left-0 shadow-lg sm:shadow-none sm:flex sm:flex-row sm:space-x-6 sm:w-auto sm:mt-0 sm:space-y-0 sm:bg-white sm:static sm:block z-50">
+          class="hidden flex-col w-full mt-4 space-y-4 text-gray-700 bg-white absolute top-full left-0 shadow-lg sm:shadow-lg sm:flex sm:flex-row sm:space-x-6 sm:w-auto sm:mt-0 sm:space-y-0 sm:bg-white sm:static sm:block z-50">
 
         {% macro nav_item(url, label) %}
           <li>
