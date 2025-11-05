@@ -1,0 +1,2 @@
+age,sex,cp,trestbps,chol,fbs,restecg,thalach,exang,oldpeak,slope,ca,thal,Prediction,Prob_Pos,Risk_Level
+26,1,3,95,1,0,0,42,0,1,1,0,1,0,0.15,Low

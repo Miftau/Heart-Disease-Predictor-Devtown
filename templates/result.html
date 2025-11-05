@@ -3,16 +3,14 @@
 
 <!-- Hero Section -->
 <section class="bg-gradient-to-r from-red-50 to-white py-16 border-b">
-  <div class="container mx-auto px-4">
-    <div class="max-w-3xl mx-auto text-center">
-      <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-        {{ "Lifestyle Health Assessment" if model_type == "cardio" else "Clinical Heart Assessment" }}
-      </h1>
-      <p class="text-xl text-gray-600 mb-6">
-        {{ "Analyzing lifestyle and general wellness indicators" if model_type == "cardio" else "Evaluating your cardiovascular health risk" }}
-      </p>
-      <div class="w-24 h-1 bg-red-500 rounded-full mx-auto"></div>
-    </div>
+  <div class="container mx-auto px-4 text-center">
+    <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+      {{ "Lifestyle Health Assessment" if model_type == "cardio" else "Clinical Heart Assessment" }}
+    </h1>
+    <p class="text-lg text-gray-600 mb-6">
+      {{ "Analyzing lifestyle and general wellness indicators" if model_type == "cardio" else "Evaluating your cardiovascular health risk" }}
+    </p>
+    <div class="w-20 h-1 bg-red-500 rounded-full mx-auto"></div>
   </div>
 </section>
 
@@ -20,8 +18,8 @@
 <section class="py-16">
   <div class="container mx-auto px-4">
     <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
-      
-      <!-- Result Header -->
+
+      <!-- Header -->
       <div class="bg-gradient-to-r from-red-500 to-red-700 text-white p-8 text-center">
         <h2 class="text-3xl font-bold mb-2">Prediction Results</h2>
         <p class="text-red-100">Based on your submitted data</p>
@@ -29,9 +27,9 @@
           Model Used: {{ "Lifestyle Model 🏃" if model_type == "cardio" else "Clinical Model ❤️" }}
         </p>
       </div>
-      
+
       <!-- Main Result -->
-      <div class="p-8">
+      <div class="p-8 space-y-6">
         {% if result %}
           {% set prob_percent = (prob * 100) | round(1) %}
           {% if risk == "Low" %}
@@ -45,18 +43,16 @@
             {% set risk_color = "text-red-700 bg-red-100" %}
           {% endif %}
 
-          <div class="mb-8 border rounded-xl bg-gray-50 p-6 shadow-inner">
-            <h2 class="text-2xl font-semibold mb-2 text-gray-800">{{ result }}</h2>
-            <p class="text-sm mb-3 text-gray-600">Prediction Confidence:</p>
-            
+          <div class="border rounded-xl bg-gray-50 p-6 shadow-inner">
+            <h2 class="text-2xl font-semibold mb-3 text-gray-800">{{ result }}</h2>
+            <p class="text-sm mb-2 text-gray-600">Prediction Confidence:</p>
+
             <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
               <div class="{{ bar_color }} h-4 rounded-full" style="width: {{ prob_percent }}%;"></div>
             </div>
-            
-            <div class="flex justify-between mt-1 text-sm text-gray-600">
-              <span>0%</span>
-              <span>{{ prob_percent }}%</span>
-              <span>100%</span>
+
+            <div class="flex justify-between mt-1 text-xs text-gray-500">
+              <span>0%</span><span>{{ prob_percent }}%</span><span>100%</span>
             </div>
 
             <div class="mt-4 text-center">
@@ -65,24 +61,65 @@
               </span>
             </div>
           </div>
+
+          <!-- Likely Condition -->
+          {% if likely_condition %}
+          <div class="bg-red-50 border-l-4 border-red-500 p-5 rounded mt-6">
+            <h3 class="text-xl font-semibold text-red-700 mb-1">Possible Condition:</h3>
+            <p class="text-gray-700 mb-2"><strong>{{ likely_condition }}</strong></p>
+            <p class="text-sm text-gray-600">
+              This result suggests a pattern similar to {{ likely_condition }} based on your inputs.
+              For an accurate medical diagnosis, consult a cardiologist or use the CardioConsultant below.
+            </p>
+          </div>
+          {% endif %}
         {% endif %}
 
+        <!-- Recommendations -->
+        <div class="bg-gray-50 p-6 rounded-xl border mt-8">
+          <h3 class="text-2xl font-semibold text-gray-800 mb-4">Personalized Health Recommendations 💡</h3>
+          <ul class="list-disc ml-5 text-gray-700 space-y-2">
+            <li>Maintain a balanced diet rich in fruits, vegetables, and whole grains.</li>
+            <li>Engage in at least 30 minutes of moderate exercise most days.</li>
+            <li>Monitor your blood pressure and cholesterol levels regularly.</li>
+            <li>Limit alcohol and avoid smoking completely for better heart health.</li>
+            <li>Practice stress management techniques like meditation or yoga.</li>
+          </ul>
+        </div>
+
         {% if tables %}
-          <div class="overflow-x-auto border-t border-gray-100 pt-4">
+          <div class="overflow-x-auto border-t border-gray-200 pt-4">
             {{ tables|safe }}
           </div>
         {% endif %}
 
-        <!-- Download / Back Buttons -->
-        <div class="flex justify-center gap-4 mt-6">
+        <!-- Actions -->
+        <div class="flex flex-wrap justify-center gap-4 mt-6">
           {% if download_link %}
-            <a href="{{ download_link }}" download class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+            <a href="{{ download_link }}" download class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
               ⬇️ Download CSV
             </a>
           {% endif %}
-          <a href="/form" class="inline-block bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded">
+          <a href="/form" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg">
             🔙 Back to Form
           </a>
+        </div>
+
+        <!-- AI CardioConsultant (Upcoming Feature) -->
+        <div class="mt-12 bg-white border rounded-2xl p-8 shadow-sm text-center">
+          <h3 class="text-2xl font-bold text-gray-800 mb-3">💬 Meet Your AI CardioConsultant (Coming Soon)</h3>
+          <p class="text-gray-600 mb-4 max-w-2xl mx-auto">
+            Our upcoming <strong>Agentic AI CardioConsultant</strong> will provide real-time insights into your results,
+            explain potential causes, and guide you on preventive and treatment options.
+          </p>
+          <div class="flex justify-center gap-4">
+            <button disabled class="bg-red-500/70 text-white px-5 py-3 rounded-lg cursor-not-allowed">
+              🎤 Voice Interaction (Soon)
+            </button>
+            <button disabled class="bg-gray-400/70 text-white px-5 py-3 rounded-lg cursor-not-allowed">
+              💡 Chat with AI (Soon)
+            </button>
+          </div>
         </div>
 
         <!-- Disclaimer -->
@@ -90,65 +127,53 @@
           <div class="flex items-start space-x-3">
             <i class="fas fa-exclamation-triangle text-yellow-500 text-lg mt-1"></i>
             <p class="text-sm text-yellow-700 leading-relaxed">
-              <strong>Note:</strong> This prediction is for educational and informational purposes only.
-              Please consult a qualified healthcare provider for medical advice or diagnosis.
+              <strong>Note:</strong> This prediction is not a substitute for professional medical advice.
+              Always consult a certified healthcare provider before making health decisions.
             </p>
           </div>
-        </div>
-
-        <!-- Retake or Explore -->
-        <div class="flex flex-col sm:flex-row gap-4 mt-8">
-          <a href="/form" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-300">
-            Retake Assessment
-          </a>
-          <a href="/resources" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold py-3 px-6 rounded-lg text-center transition duration-300">
-            Explore Health Resources
-          </a>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Resources Section -->
-<section class="py-16 bg-gray-50">
+<!-- Resources -->
+<section class="py-16 bg-gray-50 border-t">
   <div class="container mx-auto px-4">
-    <div class="text-center mb-16">
-      <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-        Helpful Resources for a Healthier Lifestyle
-      </h2>
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-gray-800 mb-3">Helpful Resources for Heart Health</h2>
       <p class="text-gray-600 max-w-2xl mx-auto">
-        Explore practical tools, guides, and healthy living resources tailored to your results.
+        Discover evidence-based tools and guides to manage your cardiovascular health better.
       </p>
-      <div class="w-24 h-1 bg-red-500 rounded-full mx-auto mt-4"></div>
+      <div class="w-20 h-1 bg-red-500 rounded-full mx-auto mt-4"></div>
     </div>
-    
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
+      <div class="bg-white p-6 rounded-xl shadow text-center">
         <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
           <i class="fas fa-heartbeat text-red-500 text-xl"></i>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Risk Factors</h3>
-        <p class="text-gray-600 mb-4">Understand and manage key health risk indicators effectively.</p>
-        <a href="#" class="text-red-500 font-medium hover:underline">Learn More →</a>
+        <h3 class="text-xl font-bold mb-2 text-gray-800">Understand Risk Factors</h3>
+        <p class="text-gray-600 mb-4">Identify and control common risk indicators effectively.</p>
+        <a href="#" class="text-red-500 font-semibold hover:underline">Learn More →</a>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
+      <div class="bg-white p-6 rounded-xl shadow text-center">
         <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
           <i class="fas fa-dumbbell text-red-500 text-xl"></i>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Exercise Plans</h3>
-        <p class="text-gray-600 mb-4">Follow proven exercise routines for heart and overall health.</p>
-        <a href="#" class="text-red-500 font-medium hover:underline">Get Started →</a>
+        <h3 class="text-xl font-bold mb-2 text-gray-800">Exercise Recommendations</h3>
+        <p class="text-gray-600 mb-4">Follow personalized workouts to boost cardiovascular fitness.</p>
+        <a href="#" class="text-red-500 font-semibold hover:underline">Start Now →</a>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
+      <div class="bg-white p-6 rounded-xl shadow text-center">
         <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
           <i class="fas fa-utensils text-red-500 text-xl"></i>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Healthy Recipes</h3>
-        <p class="text-gray-600 mb-4">Discover nutritious, easy-to-make meals that support heart health.</p>
-        <a href="https://www.nhlbi.nih.gov/health/heart-healthy-living/healthy-foods" class="text-red-500 font-medium hover:underline">View Recipes →</a>
+        <h3 class="text-xl font-bold mb-2 text-gray-800">Heart-Healthy Nutrition</h3>
+        <p class="text-gray-600 mb-4">Enjoy delicious recipes that promote long-term heart health.</p>
+        <a href="https://www.nhlbi.nih.gov/health/heart-healthy-living/healthy-foods" target="_blank" class="text-red-500 font-semibold hover:underline">View Recipes →</a>
       </div>
     </div>
   </div>

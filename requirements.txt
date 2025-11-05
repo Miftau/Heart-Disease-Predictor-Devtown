@@ -8,3 +8,4 @@ flask
 gunicorn
 Flask-Mail
 python-dotenv
+requests

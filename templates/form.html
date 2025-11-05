@@ -294,13 +294,7 @@
   </main>
 </div>
 
-<!-- Enhanced CSV file name display + Toggle Logic -->
 <script>
-  document.getElementById('csvFileInput')?.addEventListener('change', function(e) {
-    const fileName = e.target.files[0]?.name || 'No file chosen';
-    document.getElementById('fileName').textContent = fileName;
-  });
-
   const modelSelector = document.getElementById('model_type');
   const inputSelector = document.getElementById('input_mode');
   const hiddenModel = document.getElementById('hidden_model_type');
@@ -309,14 +303,27 @@
   const clinicalFields = document.querySelector('.clinical-fields');
   const lifestyleFields = document.querySelector('.lifestyle-fields');
 
+  // Helper function to toggle required attributes
+  function toggleRequired(fields, required) {
+    fields.querySelectorAll('input, select').forEach(el => {
+      if (required) el.setAttribute('required', 'required');
+      else el.removeAttribute('required');
+    });
+  }
+
   modelSelector.addEventListener('change', e => {
     hiddenModel.value = e.target.value;
+
     if (e.target.value === 'cardio') {
       clinicalFields.classList.add('hidden');
       lifestyleFields.classList.remove('hidden');
+      toggleRequired(clinicalFields, false);
+      toggleRequired(lifestyleFields, true);
     } else {
       lifestyleFields.classList.add('hidden');
       clinicalFields.classList.remove('hidden');
+      toggleRequired(lifestyleFields, false);
+      toggleRequired(clinicalFields, true);
     }
   });
 
@@ -336,11 +343,24 @@
     if (modelSelector.value === 'cardio') {
       clinicalFields.classList.add('hidden');
       lifestyleFields.classList.remove('hidden');
+      toggleRequired(clinicalFields, false);
+      toggleRequired(lifestyleFields, true);
+    } else {
+      lifestyleFields.classList.add('hidden');
+      clinicalFields.classList.remove('hidden');
+      toggleRequired(lifestyleFields, false);
+      toggleRequired(clinicalFields, true);
     }
+
     if (inputSelector.value === 'csv') {
       csvSection.classList.remove('hidden');
       manualSection.classList.add('hidden');
     }
+  });
+
+  document.getElementById('csvFileInput')?.addEventListener('change', function(e) {
+    const fileName = e.target.files[0]?.name || 'No file chosen';
+    document.getElementById('fileName').textContent = fileName;
   });
 </script>
 {% endblock %}
