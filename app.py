@@ -33,7 +33,6 @@ from flask import (
     Flask, render_template, request, redirect, url_for,
     send_from_directory, flash, jsonify, session
 )
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from dotenv import load_dotenv

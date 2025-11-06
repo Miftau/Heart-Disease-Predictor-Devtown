@@ -23,3 +23,5 @@ groq
 markdown
 bcrypt
 plotly
+flask-cors
+flask-limiter
