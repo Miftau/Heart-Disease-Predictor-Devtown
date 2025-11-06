@@ -30,33 +30,50 @@
     document.addEventListener('DOMContentLoaded', () => {
       const html = document.documentElement;
       const toggle = document.getElementById('dark-mode-toggle');
-      const sun = toggle?.querySelector('.sun');
-      const moon = toggle?.querySelector('.moon');
+      const sun = document.getElementById('dark-mode-sun'); // Target specific IDs
+      const moon = document.getElementById('dark-mode-moon');
 
-      // Apply saved preference
+      if (!toggle) {
+          console.error("Dark mode toggle button not found!");
+          return;
+      }
+
+      // Apply saved preference or system preference
       const saved = localStorage.getItem('darkMode');
-      if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = saved === 'dark' || (!saved && prefersDark);
+
+      if (isDark) {
         html.classList.add('dark');
-        sun?.classList.add('hidden');
-        moon?.classList.remove('hidden');
+        if (sun) sun.classList.add('hidden');
+        if (moon) moon.classList.remove('hidden');
       } else {
-        sun?.classList.remove('hidden');
-        moon?.classList.add('hidden');
+        if (sun) sun.classList.remove('hidden');
+        if (moon) moon.classList.add('hidden');
       }
 
       // Toggle handler
-      toggle?.addEventListener('click', () => {
+      toggle.addEventListener('click', () => {
         html.classList.toggle('dark');
-        const isDark = html.classList.contains('dark');
-        localStorage.setItem('darkMode', isDark ? 'dark' : 'light');
-        sun?.classList.toggle('hidden', isDark);
-        moon?.classList.toggle('hidden', !isDark);
+        const isCurrentlyDark = html.classList.contains('dark');
+        localStorage.setItem('darkMode', isCurrentlyDark ? 'dark' : 'light');
+        if (sun) {
+          sun.classList.toggle('hidden', isCurrentlyDark);
+        }
+        if (moon) {
+          moon.classList.toggle('hidden', !isCurrentlyDark);
+        }
       });
 
       // ---- 2. Navbar --------------------------------------------------------
       const menu = document.getElementById('mobile-menu');
       const btn  = document.getElementById('mobile-menu-toggle');
       const icon = document.getElementById('menu-icon');
+
+      if (!menu || !btn || !icon) {
+          console.warn("Mobile menu elements not found, skipping mobile menu setup.");
+          return; // Exit if mobile menu elements are missing
+      }
 
       // Show/hide based on breakpoint
       const handleResize = () => {
@@ -73,7 +90,7 @@
       window.addEventListener('resize', handleResize);
 
       // Toggle on button click
-      btn?.addEventListener('click', (e) => {
+      btn.addEventListener('click', (e) => {
         e.stopPropagation();
         menu.classList.toggle('hidden');
         icon.classList.toggle('fa-bars');
@@ -106,6 +123,9 @@
     .dark .bg-gray-50 { @apply bg-gray-900; }
     .dark .shadow-lg { @apply shadow-gray-700; }
     .dark .border-gray-800 { @apply border-gray-700; }
+    .dark .bg-gray-900 { @apply bg-gray-900; } /* Ensure bg-gray-900 is distinct in dark mode */
+    /* Ensure sticky navbar has high z-index */
+    .sticky-nav { z-index: 9999; }
 
     /* Hide when Alpine would use x-cloak */
     [x-cloak] { display: none !important; }
@@ -135,6 +155,7 @@
       max-height: 600px;   /* enough for all items */
       padding: 1rem 0;
       background: white;
+      @apply dark:bg-gray-800; /* Apply dark mode bg to menu */
     }
     @media (min-width: 640px) {
       #mobile-menu { max-height: none !important; padding: 0 !important; }
@@ -149,9 +170,9 @@
 </head>
 
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col transition-colors duration-300">
-
   <!-- ==================== NAVBAR ==================== -->
-  <nav class="bg-white shadow-lg py-4 sticky top-0 z-50 transition-all duration-300">
+  <!-- Ensure the navbar container is relative to the document flow -->
+  <nav class="bg-white shadow-lg py-4 sticky top-0 z-50 transition-all duration-300 sticky-nav">
     <div class="container mx-auto flex justify-between items-center px-4 sm:px-6">
 
       <!-- Logo -->
@@ -163,8 +184,8 @@
       <button id="dark-mode-toggle"
               class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               aria-label="Toggle dark mode">
-        <i class="fas fa-sun sun text-yellow-500 text-xl"></i>
-        <i class="fas fa-moon moon hidden text-indigo-400 text-xl"></i>
+        <i id="dark-mode-sun" class="fas fa-sun text-yellow-500 text-xl"></i>
+        <i id="dark-mode-moon" class="fas fa-moon hidden text-indigo-400 text-xl"></i>
       </button>
 
       <!-- Mobile hamburger (sm:hidden) -->
@@ -222,13 +243,14 @@
   </nav>
 
   <!-- ==================== MAIN CONTENT ==================== -->
+  <!-- Ensure main content starts below the fixed/sticky navbar -->
   <main class="flex-1 container mx-auto p-4 sm:p-6">
     <div data-aos="fade-up">
       {% block content %}{% endblock %}
     </div>
   </main>
 
-<!-- Footer -->
+  <!-- Footer -->
   <footer class="bg-gray-900 text-gray-300 mt-auto">
     <div class="container mx-auto px-4 py-8 sm:py-12">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
