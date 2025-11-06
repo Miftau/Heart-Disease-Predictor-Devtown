@@ -9,3 +9,17 @@ gunicorn
 Flask-Mail
 python-dotenv
 requests
+python-dotenv
+supabase
+sqlalchemy
+flask-sqlalchemy
+flask-migrate
+psycopg2-binary
+openai
+faiss-cpu
+tiktoken
+pyjwt
+groq
+markdown
+bcrypt
+plotly

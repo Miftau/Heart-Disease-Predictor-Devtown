@@ -1,2 +1,0 @@
-age,gender,height,weight,ap_hi,ap_lo,cholesterol,gluc,smoke,alco,active,Prediction,Prob_Pos,Risk_Level
-,1,182,68,120,95,1,1,0,0,1,0,0.37,Medium

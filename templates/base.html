@@ -192,6 +192,7 @@
         {{ nav_item('/about', 'About') }}
         {{ nav_item('/contact', 'Contact') }}
         {{ nav_item('/resources', 'Resources') }}
+        {{ nav_item('/chat', 'CardioConsultant') }}
 
         <li>
           <a href="/form"
@@ -200,6 +201,22 @@
             Predict Now
           </a>
         </li>
+         <!-- Login / Logout logic -->
+        {% if session.get('user_id') %}
+          <li>
+            <a href="/logout"
+               class="block bg-gray-800 text-white px-4 py-2 rounded-full hover:bg-gray-900 hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-md sm:text-lg text-center font-semibold mx-4 sm:mx-0">
+              Logout
+            </a>
+          </li>
+        {% else %}
+          <li>
+            <a href="/login"
+               class="block bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 hover:shadow-xl transform hover:scale-105 transition-all duration-300 text-md sm:text-lg text-center font-semibold mx-4 sm:mx-0">
+              Login
+            </a>
+          </li>
+        {% endif %}
       </ul>
     </div>
   </nav>
