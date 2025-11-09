@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </ul>
         <!-- Button now links to form for non-logged-in users, dashboard for logged-in users -->
         {% if session.get('user_id') %}
-            <a href="{{ url_for('user_dashboard') }}" class="block w-full py-3 text-center bg-gray-200 text-gray-800 font-bold rounded-lg
+            <a href="{{ url_for('user_dashboard') }}#subscriptions" class="block w-full py-3 text-center bg-gray-200 text-gray-800 font-bold rounded-lg
                                    hover:bg-gray-300 transition duration-300">
               Manage Account
             </a>
