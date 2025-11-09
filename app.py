@@ -650,8 +650,8 @@ def login():
                 try:
                     if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                         session.clear()
-                        session["user_id"] = user.get("id")
-                        session["user_name"] = user.get("name")
+                        session["id"] = user.get("id")
+                        session["name"] = user.get("name")
 
                         # --- STEP 1A: Detect Role ---
                         # Default role is 'user', unless doctor or admin
@@ -659,10 +659,10 @@ def login():
 
                         # If not admin, check if this user is a doctor
                         if role != "admin":
-                            doctor_check = supabase.table("doctors").select("id").eq("user_id", user["id"]).execute()
+                            doctor_check = supabase.table("doctors").select("id").eq("id", user["id"]).execute()
                             if doctor_check.data:
                                 role = "doctor"
-                                session["doctor_id"] = doctor_check.data[0]["id"]
+                                session["id"] = doctor_check.data[0]["id"]
 
                         session["role"] = role
 
@@ -691,9 +691,9 @@ def login():
 
                 if stored_hash and bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                     session.clear()
-                    session["admin_id"] = admin.get("id")
+                    session["id"] = admin.get("id")
                     session["role"] = "admin"
-                    session["user_name"] = admin.get("name")
+                    session["name"] = admin.get("name")
                     flash("Welcome back, Admin!", "success")
                     return redirect(url_for("admin_dashboard"))
         except Exception as e:
@@ -770,6 +770,10 @@ def index():
 @app.route("/about")
 def about():
     return render_template("about.html")
+
+@app.route("/resources")
+def resources():
+    return render_template("resources.html")
 
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
