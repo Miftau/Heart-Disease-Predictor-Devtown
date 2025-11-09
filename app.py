@@ -1223,6 +1223,21 @@ def my_bookings():
 # Routes - Subscription Management
 # ============================================================
 
+@app.route("/pricing")
+def pricing():
+    """Display available subscription plans."""
+    try:
+        # Fetch all active subscription plans from Supabase
+        response = supabase.table("subscription_plans").select("*").eq("is_active", True).execute()
+        plans = response.data or []
+        # Sort by price (optional)
+        plans.sort(key=lambda x: float(x["price"]))
+    except Exception as e:
+        print(f"Error fetching plans: {e}")
+        flash("Error loading plans. Please try again later.", "danger")
+        plans = [] # Fallback to empty list if fetch fails
+    return render_template("pricing.html", plans=plans) 
+
 @app.route("/subscribe/<plan_name>", methods=["GET", "POST"])
 @login_required
 def subscribe(plan_name):

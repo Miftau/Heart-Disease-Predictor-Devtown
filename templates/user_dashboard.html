@@ -88,7 +88,7 @@
     </div>
 
     <!-- Subscription Section -->
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-10 border border-gray-100" id="subscriptions">
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-10 border border-gray-100" id="subscriptions"> <!-- Added id="subscriptions" -->
       <h3 class="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
         <span class="bg-gradient-to-r from-red-500 to-red-700 p-1 rounded-lg text-white text-sm">💳</span>
         Your Subscriptions
@@ -144,7 +144,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
           </svg>
           <p class="text-gray-600">You have no active subscriptions.</p>
-          <a href="{{ url_for('user_dashboard') }}#subscriptions" class="mt-2 inline-block bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-red-700 shadow-md transition duration-300 text-sm">
+          <a href="{{ url_for('pricing') }}" class="mt-2 inline-block bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-red-700 shadow-md transition duration-300 text-sm">
             View Plans & Subscribe
           </a>
         </div>
@@ -268,7 +268,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <p class="text-gray-600">No assessments yet. Complete one to see your progress!</p>
-          <a href="/assessment" class="mt-4 inline-block bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-xl hover:from-red-600 hover:to-red-700 shadow-md transition duration-300">
+          <a href="/form" class="mt-4 inline-block bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-xl hover:from-red-600 hover:to-red-700 shadow-md transition duration-300">
             Start Assessment
           </a>
         </div>
