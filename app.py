@@ -520,17 +520,17 @@ def check_subscription_access(f):
         if not user_id:
             # For non-logged-in users, check session-based limit for /form
             if request.endpoint == 'predict': # Only apply to the form submission route
-                 last_form_time = session.get('last_form_time')
-                 if last_form_time:
-                     last_time = datetime.fromisoformat(last_form_time)
-                     now = datetime.now()
-                     if now - last_time < timedelta(days=30): # 30 days for example
-                         flash("You can only submit the form once per month as a non-logged-in user.", "warning")
-                         return redirect(url_for('form'))
+                last_form_time = session.get('last_form_time')
+                if last_form_time:
+                    last_time = datetime.fromisoformat(last_form_time)
+                    now = datetime.now()
+                    if now - last_time < timedelta(days=30): # 30 days for example
+                        flash("You can only submit the form once per month as a non-logged-in user.", "warning")
+                        return redirect(url_for('form'))
             # Redirect to login or show restricted message for other features
             elif request.endpoint in ['chat', 'book_appointment']:
-                 flash("Please log in to access this feature.", "warning")
-                 return redirect(url_for('login'))
+                flash("Please log in to access this feature.", "warning")
+                return redirect(url_for('login'))
             # Allow access to the decorated function
             return f(*args, **kwargs)
 
@@ -542,31 +542,29 @@ def check_subscription_access(f):
             flash("Error checking subscription status. Please try again later.", "danger")
             return redirect(url_for('user_dashboard'))
 
-        # Check if user has a paid subscription
         if not is_free_plan and sub_status == "active":
             # Paid subscriber, allow access
             return f(*args, **kwargs)
-        else:
-            # Free subscriber or no active subscription
-            if request.endpoint == 'predict':
-                # Check usage limit for /form
-                try:
-                    # Get the first record of the current month for this user
-                    start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                    records = supabase.table("records").select("id").eq("user_id", user_id).gte("created_at", start_of_month.isoformat()).execute().data
-                    if len(records) >= 1: # Change 1 to your desired limit for paid users if different
-                        flash("You have reached your monthly limit for form submissions.", "warning")
-                        return redirect(url_for('user_dashboard'))
-                except Exception as e:
-                    print(f"Error checking form limit for user {user_id}: {e}")
-                    flash("Error checking usage limit. Please try again.", "danger")
+        # Free subscriber or no active subscription
+        if request.endpoint == 'predict':
+            # Check usage limit for /form
+            try:
+                # Get the first record of the current month for this user
+                start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                records = supabase.table("records").select("id").eq("user_id", user_id).gte("created_at", start_of_month.isoformat()).execute().data
+                if len(records) >= 1: # Change 1 to your desired limit for paid users if different
+                    flash("You have reached your monthly limit for form submissions.", "warning")
                     return redirect(url_for('user_dashboard'))
-            elif request.endpoint in ['chat', 'book_appointment']:
-                # Restrict chat and booking for free users
-                flash("This feature is available for paid subscribers only.", "warning")
+            except Exception as e:
+                print(f"Error checking form limit for user {user_id}: {e}")
+                flash("Error checking usage limit. Please try again.", "danger")
                 return redirect(url_for('user_dashboard'))
-            # Allow access to the decorated function (e.g., for /form if limit not reached)
-            return f(*args, **kwargs)
+        elif request.endpoint in ['chat', 'book_appointment']:
+            # Restrict chat and booking for free users
+            flash("This feature is available for paid subscribers only.", "warning")
+            return redirect(url_for('user_dashboard'))
+        # Allow access to the decorated function (e.g., for /form if limit not reached)
+        return f(*args, **kwargs)
 
     return decorated_function
 
@@ -585,41 +583,40 @@ def about():
 
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
-    if request.method == "POST":
-        name = request.form.get("name")
-        email = request.form.get("email")
-        subject = request.form.get("subject")
-        message = request.form.get("message")
+    if request.method != "POST":
+        return render_template("contact.html")
+    name = request.form.get("name")
+    email = request.form.get("email")
+    subject = request.form.get("subject")
+    message = request.form.get("message")
 
-        if not all([name, email, message]):
-            flash("Please fill all fields.", "danger")
-            return redirect(url_for("contact"))
-
-        try:
-            msg = Message(
-                subject=f"[CardioGuard] {subject or 'New Message'} from {name}",
-                recipients=[os.getenv("MAIL_DEFAULT_RECEIVER")],
-                body=f"Name: {name}\nEmail: {email}\n{message}"
-            )
-            mail.send(msg)
-            flash("✅ Message sent successfully!", "success")
-        except Exception as e:
-            print("Mail send error:", e)
-            flash("❌ Failed to send message.", "danger")
+    if not all([name, email, message]):
+        flash("Please fill all fields.", "danger")
         return redirect(url_for("contact"))
-    return render_template("contact.html")
+
+    try:
+        msg = Message(
+            subject=f"[CardioGuard] {subject or 'New Message'} from {name}",
+            recipients=[os.getenv("MAIL_DEFAULT_RECEIVER")],
+            body=f"Name: {name}\nEmail: {email}\n{message}"
+        )
+        mail.send(msg)
+        flash("✅ Message sent successfully!", "success")
+    except Exception as e:
+        print("Mail send error:", e)
+        flash("❌ Failed to send message.", "danger")
+    return redirect(url_for("contact"))
 
 @app.route("/form")
 def form():
     # Check access for non-logged-in users only
     if not session.get("user_id"):
-        last_form_time = session.get('last_form_time')
-        if last_form_time:
-             last_time = datetime.fromisoformat(last_form_time)
-             now = datetime.now()
-             if now - last_time < timedelta(days=30): # 30 days
-                 flash("You can only access the form once per month as a non-logged-in user.", "warning")
-                 return redirect(url_for('index'))
+        if last_form_time := session.get('last_form_time'):
+            last_time = datetime.fromisoformat(last_form_time)
+            now = datetime.now()
+            if now - last_time < timedelta(days=30): # 30 days
+                flash("You can only access the form once per month as a non-logged-in user.", "warning")
+                return redirect(url_for('index'))
     return render_template(
         "form.html",
         BASE_COLUMNS_CLINICAL=BASE_COLUMNS_CLINICAL,
@@ -637,7 +634,6 @@ def predict():
         uploaded_file = request.files.get("file")
         if uploaded_file and uploaded_file.filename:
             df = pd.read_csv(uploaded_file)
-            results = prepare_and_predict(df, model_type)
         else:
             base_cols = BASE_COLUMNS_CLINICAL if model_type == "clinical" else BASE_COLUMNS_LIFESTYLE
             user_data = {}
@@ -652,11 +648,8 @@ def predict():
                 user_data[c] = val
 
             df = pd.DataFrame([user_data])
-            results = prepare_and_predict(df, model_type)
-
-        # --- POST-SUCCESS LOGIC FOR ACCESS CONTROL ---
-        user_id = session.get("user_id")
-        if user_id:
+        results = prepare_and_predict(df, model_type)
+        if user_id := session.get("user_id"):
             # Logged in user: record the prediction in the 'records' table
             # This implicitly tracks usage for paid users based on plan limits (handled in decorator)
             try:
@@ -838,23 +831,19 @@ def register():
             # For email confirmation, the user needs to click the link in their email.
             # The 'user' part of the response contains the user object from auth.users
             auth_user = auth_response.user
-            if auth_user:
-                # If auto-confirm is enabled, the user might be logged in automatically.
-                # It's safer to rely on email confirmation to create the profile in the 'users' table upon first login.
-                # So, we might not need to create the profile here unless auto-confirm is on.
-                # Let's assume auto-confirm is OFF, so profile creation happens in login.
-                flash("✅ Account created! Please check your email to confirm.", "success")
-            else:
-                # This case might occur if auto-confirm is off, and the user just gets created but not logged in.
-                flash("✅ Account created! Please check your email to confirm.", "success")
+            # If auto-confirm is enabled, the user might be logged in automatically.
+            # It's safer to rely on email confirmation to create the profile in the 'users' table upon first login.
+            # So, we might not need to create the profile here unless auto-confirm is on.
+            # Let's assume auto-confirm is OFF, so profile creation happens in login.
+            flash("✅ Account created! Please check your email to confirm.", "success")
             return redirect(url_for("login"))
         except Exception as e:
             print("Signup error:", e)
             error_msg = str(e).lower()
             if "email taken" in error_msg:
-                 flash("Email already registered. Try logging in.", "warning")
+                flash("Email already registered. Try logging in.", "warning")
             else:
-                 flash(f"Signup failed: {str(e)}", "danger")
+                flash(f"Signup failed: {str(e)}", "danger")
             return redirect(url_for("register"))
     return render_template("register.html")
 
@@ -1021,7 +1010,19 @@ def auth_callback(provider):
     else:
         return redirect(url_for("user_dashboard"))
 
-# --- NEW: Subscription Management Routes ---
+# --- Subscription Management Routes ---
+
+@app.route("/pricing")
+def pricing():
+    # Fetch all active subscription plans
+    response = supabase.table("subscription_plans").select("*").eq("is_active", True).execute()
+    plans = response.data or []
+
+    # Sort by price (optional)
+    plans.sort(key=lambda x: float(x["price"]))
+
+    return render_template("pricing.html", plans=plans)
+
 @app.route("/subscribe/<plan_name>", methods=["GET", "POST"])
 @login_required
 def subscribe(plan_name):
@@ -1148,8 +1149,8 @@ def doctor_dashboard():
         user_ids_needed = [appt["user_id"] for appt in booked_appointments]
         patient_details = {}
         if user_ids_needed:
-             users_info = supabase.table("users").select("id, name, email").in_("id", user_ids_needed).execute().data
-             patient_details = {u["id"]: u for u in users_info}
+            users_info = supabase.table("users").select("id, name, email").in_("id", user_ids_needed).execute().data
+            patient_details = {u["id"]: u for u in users_info}
     except Exception as e:
         print(f"Error fetching doctor dashboard data: {e}")
         flash("Error loading dashboard data. Please try again later.", "danger")
@@ -1214,13 +1215,15 @@ def user_dashboard():
         # Determine current plan status for UI hints
         current_plan_is_free = True
         if user_subscriptions:
-            # Get the most recent active or non-cancelled subscription
-            active_subs = [sub for sub in user_subscriptions if sub.get("status") != "cancelled"]
-            if active_subs:
-                 # Sort by start_date descending to get the latest
-                 latest_sub = sorted(active_subs, key=lambda x: x.get("start_date", ""), reverse=True)[0]
-                 plan_info = latest_sub.get("subscription_plans", {})
-                 current_plan_is_free = plan_info.get("is_free", True)
+            if active_subs := [
+                sub
+                for sub in user_subscriptions
+                if sub.get("status") != "cancelled"
+            ]:
+                # Sort by start_date descending to get the latest
+                latest_sub = sorted(active_subs, key=lambda x: x.get("start_date", ""), reverse=True)[0]
+                plan_info = latest_sub.get("subscription_plans", {})
+                current_plan_is_free = plan_info.get("is_free", True)
 
     except Exception as e:
         print(f"Error fetching user dashboard data: {e}")
