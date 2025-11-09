@@ -801,13 +801,12 @@ def contact():
 def form():
     # Check access for non-logged-in users only
     if not session.get("user_id"):
-        last_form_time = session.get('last_form_time')
-        if last_form_time:
-             last_time = datetime.fromisoformat(last_form_time)
-             now = datetime.now()
-             if now - last_time < timedelta(days=30): # 30 days
-                 flash("You can only access the form once per month as a non-logged-in user.", "warning")
-                 return redirect(url_for('index'))
+        if last_form_time := session.get('last_form_time'):
+            last_time = datetime.fromisoformat(last_form_time)
+            now = datetime.now()
+            if now - last_time < timedelta(days=30): # 30 days
+                flash("You can only access the form once per month as a non-logged-in user.", "warning")
+                return redirect(url_for('index'))
     return render_template(
         "form.html",
         BASE_COLUMNS_CLINICAL=BASE_COLUMNS_CLINICAL,
@@ -829,7 +828,6 @@ def predict():
         uploaded_file = request.files.get("file")
         if uploaded_file and uploaded_file.filename:
             df = pd.read_csv(uploaded_file)
-            results = prepare_and_predict(df, model_type)
         else:
             base_cols = BASE_COLUMNS_CLINICAL if model_type == "clinical" else BASE_COLUMNS_LIFESTYLE
             user_data = {}
@@ -844,11 +842,8 @@ def predict():
                 user_data[c] = val
 
             df = pd.DataFrame([user_data])
-            results = prepare_and_predict(df, model_type)
-
-        # --- POST-SUCCESS LOGIC FOR ACCESS CONTROL ---
-        user_id = session.get("user_id")
-        if user_id:
+        results = prepare_and_predict(df, model_type)
+        if user_id := session.get("user_id"):
             # Logged in user: record the prediction in the 'records' table
             # This implicitly tracks usage for paid users based on plan limits (handled in decorator)
             try:
@@ -1333,8 +1328,8 @@ def doctor_dashboard():
         user_ids_needed = [appt["user_id"] for appt in booked_appointments]
         patient_details = {}
         if user_ids_needed:
-             users_info = supabase.table("users").select("id, name, email").in_("id", user_ids_needed).execute().data
-             patient_details = {u["id"]: u for u in users_info}
+            users_info = supabase.table("users").select("id, name, email").in_("id", user_ids_needed).execute().data
+            patient_details = {u["id"]: u for u in users_info}
     except Exception as e:
         print(f"Error fetching doctor dashboard data: {e}")
         flash("Error loading dashboard data. Please try again later.", "danger")
@@ -1399,13 +1394,15 @@ def user_dashboard():
         # Determine current plan status for UI hints
         current_plan_is_free = True
         if user_subscriptions:
-            # Get the most recent active or non-cancelled subscription
-            active_subs = [sub for sub in user_subscriptions if sub.get("status") != "cancelled"]
-            if active_subs:
-                 # Sort by start_date descending to get the latest
-                 latest_sub = sorted(active_subs, key=lambda x: x.get("start_date", ""), reverse=True)[0]
-                 plan_info = latest_sub.get("subscription_plans", {})
-                 current_plan_is_free = plan_info.get("is_free", True)
+            if active_subs := [
+                sub
+                for sub in user_subscriptions
+                if sub.get("status") != "cancelled"
+            ]:
+                # Sort by start_date descending to get the latest
+                latest_sub = sorted(active_subs, key=lambda x: x.get("start_date", ""), reverse=True)[0]
+                plan_info = latest_sub.get("subscription_plans", {})
+                current_plan_is_free = plan_info.get("is_free", True)
 
     except Exception as e:
         print(f"Error fetching user dashboard data: {e}")
