@@ -430,9 +430,9 @@ def call_openai_chat(user_message: str, system_prompt: Optional[str] = None) -> 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash("Please log in to access this page.", "warning")
-            return redirect(url_for('login'))
+        if not session.get("user_id") and not session.get("doctor_id") and not session.get("admin_id"):
+            flash("Please log in to continue.", "warning")
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -508,17 +508,17 @@ def check_subscription_access(f):
         if not user_id:
             # For non-logged-in users, check session-based limit for /form
             if request.endpoint == 'predict': # Only apply to the form submission route
-                 last_form_time = session.get('last_form_time')
-                 if last_form_time:
-                     last_time = datetime.fromisoformat(last_form_time)
-                     now = datetime.now()
-                     if now - last_time < timedelta(days=30): # 30 days for example
-                         flash("You can only submit the form once per month as a non-logged-in user.", "warning")
-                         return redirect(url_for('form'))
+                last_form_time = session.get('last_form_time')
+                if last_form_time:
+                    last_time = datetime.fromisoformat(last_form_time)
+                    now = datetime.now()
+                    if now - last_time < timedelta(days=30): # 30 days for example
+                        flash("You can only submit the form once per month as a non-logged-in user.", "warning")
+                        return redirect(url_for('form'))
             # Redirect to login or show restricted message for other features
             elif request.endpoint in ['chat', 'book_appointment']:
-                 flash("Please log in to access this feature.", "warning")
-                 return redirect(url_for('login'))
+                flash("Please log in to access this feature.", "warning")
+                return redirect(url_for('login'))
             # Allow access to the decorated function
             return f(*args, **kwargs)
 
@@ -530,31 +530,29 @@ def check_subscription_access(f):
             flash("Error checking subscription status. Please try again later.", "danger")
             return redirect(url_for('user_dashboard'))
 
-        # Check if user has a paid subscription
         if not is_free_plan and sub_status == "active":
             # Paid subscriber, allow access
             return f(*args, **kwargs)
-        else:
-            # Free subscriber or no active subscription
-            if request.endpoint == 'predict':
-                # Check usage limit for /form
-                try:
-                    # Get the first record of the current month for this user
-                    start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                    records = supabase.table("records").select("id").eq("user_id", user_id).gte("created_at", start_of_month.isoformat()).execute().data
-                    if len(records) >= 1: # Change 1 to your desired limit for paid users if different
-                        flash("You have reached your monthly limit for form submissions.", "warning")
-                        return redirect(url_for('user_dashboard'))
-                except Exception as e:
-                    print(f"Error checking form limit for user {user_id}: {e}")
-                    flash("Error checking usage limit. Please try again.", "danger")
+        # Free subscriber or no active subscription
+        if request.endpoint == 'predict':
+            # Check usage limit for /form
+            try:
+                # Get the first record of the current month for this user
+                start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                records = supabase.table("records").select("id").eq("user_id", user_id).gte("created_at", start_of_month.isoformat()).execute().data
+                if len(records) >= 1: # Change 1 to your desired limit for paid users if different
+                    flash("You have reached your monthly limit for form submissions.", "warning")
                     return redirect(url_for('user_dashboard'))
-            elif request.endpoint in ['chat', 'book_appointment']:
-                # Restrict chat and booking for free users
-                flash("This feature is available for paid subscribers only.", "warning")
+            except Exception as e:
+                print(f"Error checking form limit for user {user_id}: {e}")
+                flash("Error checking usage limit. Please try again.", "danger")
                 return redirect(url_for('user_dashboard'))
-            # Allow access to the decorated function (e.g., for /form if limit not reached)
-            return f(*args, **kwargs)
+        elif request.endpoint in ['chat', 'book_appointment']:
+            # Restrict chat and booking for free users
+            flash("This feature is available for paid subscribers only.", "warning")
+            return redirect(url_for('user_dashboard'))
+        # Allow access to the decorated function (e.g., for /form if limit not reached)
+        return f(*args, **kwargs)
 
     return decorated_function
 
@@ -633,58 +631,79 @@ def login():
         password = request.form.get("password", "")
 
         if not email or not password:
-            flash("Provide both email and password", "warning")
+            flash("Please provide both email and password.", "warning")
             return redirect(url_for("login"))
 
-        # 1) Try to authenticate against users table (role-aware)
+        # ---- STEP 1: Check Users Table ----
         try:
             user_resp = supabase.table("users").select("*").eq("email", email).limit(1).execute()
         except Exception as e:
-            print("Supabase query error:", e)
-            flash("Login temporarily unavailable. Try later.", "danger")
+            print("Supabase user query error:", e)
+            flash("Login temporarily unavailable. Please try again later.", "danger")
             return redirect(url_for("login"))
 
         if user_resp and user_resp.data:
             user = user_resp.data[0]
             stored_hash = user.get("password_hash")
+
             if stored_hash:
-                # stored_hash expected to be bcrypt style e.g. $2b$...
                 try:
                     if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                         session.clear()
                         session["user_id"] = user.get("id")
-                        session["role"] = user.get("role", "user")
                         session["user_name"] = user.get("name")
-                        # redirect based on role
-                        if session["role"] == "admin":
+
+                        # --- STEP 1A: Detect Role ---
+                        # Default role is 'user', unless doctor or admin
+                        role = user.get("role", "user")
+
+                        # If not admin, check if this user is a doctor
+                        if role != "admin":
+                            doctor_check = supabase.table("doctors").select("id").eq("user_id", user["id"]).execute()
+                            if doctor_check.data:
+                                role = "doctor"
+                                session["doctor_id"] = doctor_check.data[0]["id"]
+
+                        session["role"] = role
+
+                        # --- STEP 1B: Redirect Based on Role ---
+                        if role == "admin":
+                            flash("Welcome back, Admin!", "success")
                             return redirect(url_for("admin_dashboard"))
-                        elif session["role"] == "doctor":
-                            return redirect(url_for("doctor_dashboard"))  # you'll create route
+                        elif role == "doctor":
+                            flash("Welcome Doctor!", "success")
+                            return redirect(url_for("doctor_dashboard"))
                         else:
+                            flash("Welcome back!", "success")
                             return redirect(url_for("user_dashboard"))
+
                 except ValueError as e:
-                    # Bad stored hash format
-                    print("Password check error (hash format):", e)
-                    flash("Authentication error (password format). Contact admin.", "danger")
+                    print("Password hash error:", e)
+                    flash("Error verifying credentials. Contact support.", "danger")
                     return redirect(url_for("login"))
 
-        # 2) If not found in users or bad password, try admins table (if you keep it separate)
+        # ---- STEP 2: Check Admins Table (Fallback) ----
         try:
             admin_resp = supabase.table("admins").select("*").eq("email", email).limit(1).execute()
             if admin_resp and admin_resp.data:
                 admin = admin_resp.data[0]
                 stored_hash = admin.get("password_hash")
+
                 if stored_hash and bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                     session.clear()
                     session["admin_id"] = admin.get("id")
                     session["role"] = "admin"
                     session["user_name"] = admin.get("name")
+                    flash("Welcome back, Admin!", "success")
                     return redirect(url_for("admin_dashboard"))
         except Exception as e:
             print("Supabase admin lookup error:", e)
 
-        flash("Invalid email or password", "danger")
+        flash("Invalid email or password.", "danger")
         return redirect(url_for("login"))
+
+    return render_template("login.html")
+
 
     # GET
     return render_template("login.html")
@@ -1479,9 +1498,9 @@ def admin_dashboard():
             "id, user_id, status, start_date, end_date, subscription_plans(name, price)"
         ).execute().data
 
-        # Fetch user names/emails for display
-        user_ids_for_subs = list({sub["user_id"] for sub in user_subscriptions})
-        if user_ids_for_subs:
+        if user_ids_for_subs := list(
+            {sub["user_id"] for sub in user_subscriptions}
+        ):
             users_for_subs = supabase.table("users").select("id, name, email").in_("id", user_ids_for_subs).execute().data
             user_lookup_for_subs = {u["id"]: u for u in users_for_subs}
         else:
