@@ -1363,41 +1363,70 @@ def log_activity(user_id, plan_id, activity_type):
 # -------------------
 # Login route (updated for Supabase Auth)
 # -------------------
+# -------------------
+# Login route
+# -------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+
         if not email or not password:
             flash("Provide both email and password", "warning")
             return redirect(url_for("login"))
 
+        # 1) Try to authenticate against users table (role-aware)
         try:
-            session_data = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
-            handle_supabase_auth_session(session_data) # Process session and set Flask session
-            flash("Logged in successfully!", "success")
-
-            role = session["role"]
-            if role == "admin":
-                return redirect(url_for("admin_dashboard"))
-            elif role == "doctor":
-                return redirect(url_for("doctor_dashboard"))
-            else:
-                return redirect(url_for("user_dashboard"))
-
+            user_resp = supabase.table("users").select("*").eq("email", email).limit(1).execute()
         except Exception as e:
-            print("Login error:", e)
-            error_msg = str(e).lower()
-            if "invalid login" in error_msg:
-                 flash("Invalid email or password.", "danger")
-            elif "email not confirmed" in error_msg:
-                 flash("Please confirm your email address before logging in.", "warning")
-            else:
-                 flash(f"Login failed: {str(e)}", "danger")
+            print("Supabase query error:", e)
+            flash("Login temporarily unavailable. Try later.", "danger")
             return redirect(url_for("login"))
+
+        if user_resp and user_resp.data:
+            user = user_resp.data[0]
+            stored_hash = user.get("password_hash")
+            if stored_hash:
+                # stored_hash expected to be bcrypt style e.g. $2b$...
+                try:
+                    if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
+                        session.clear()
+                        session["user_id"] = user.get("id")
+                        session["role"] = user.get("role", "user")
+                        session["user_name"] = user.get("name")
+                        # redirect based on role
+                        if session["role"] == "admin":
+                            return redirect(url_for("admin_dashboard"))
+                        elif session["role"] == "doctor":
+                            return redirect(url_for("doctor_dashboard"))  # you'll create route
+                        else:
+                            return redirect(url_for("user_dashboard"))
+                except ValueError as e:
+                    # Bad stored hash format
+                    print("Password check error (hash format):", e)
+                    flash("Authentication error (password format). Contact admin.", "danger")
+                    return redirect(url_for("login"))
+
+        # 2) If not found in users or bad password, try admins table (if you keep it separate)
+        try:
+            admin_resp = supabase.table("admins").select("*").eq("email", email).limit(1).execute()
+            if admin_resp and admin_resp.data:
+                admin = admin_resp.data[0]
+                stored_hash = admin.get("password_hash")
+                if stored_hash and bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
+                    session.clear()
+                    session["admin_id"] = admin.get("id")
+                    session["role"] = "admin"
+                    session["user_name"] = admin.get("name")
+                    return redirect(url_for("admin_dashboard"))
+        except Exception as e:
+            print("Supabase admin lookup error:", e)
+
+        flash("Invalid email or password", "danger")
+        return redirect(url_for("login"))
+
+    # GET
     return render_template("login.html")
 
 @app.route("/logout")
