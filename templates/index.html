@@ -158,68 +158,63 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <!-- Basic -->
-      <div class="bg-gray-50 p-8 rounded-xl border border-gray-200
-                  hover:shadow-xl transition-all duration-300"
-           data-aos="fade-up" data-aos-delay="100">
-        <h3 class="text-2xl font-bold text-gray-800 mb-4">{{ 'Basic' }}</h3>
-        <div class="mb-6">
-          <span class="text-4xl font-extrabold text-gray-900">{{ 'Free' }}</span>
+      {% for plan in plans %}
+        <div class="
+            {% if plan.name == 'Pro' %}bg-white p-8 rounded-xl border-4 border-red-500 relative{% else %}{{ 'bg-gray-50' if plan.is_free else 'bg-white' }} p-8 rounded-xl border border-gray-200{% endif %}
+            hover:shadow-2xl hover:-translate-y-1 transition-all duration-500
+            {% if plan.name != 'Pro' %}transform hover:scale-105{% endif %}"
+             data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
+          {% if plan.name == 'Pro' %}
+            <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+                        bg-red-500 text-white text-xs font-bold px-4 py-1 rounded-full animate-pulse">
+              Most Popular
+            </div>
+          {% endif %}
+          <h3 class="text-2xl font-bold text-gray-800 mb-4">{{ plan.name }}</h3>
+          <div class="mb-6">
+            {% if plan.is_free %}
+              <span class="text-4xl font-extrabold text-gray-900">Free</span>
+            {% else %}
+              <span class="text-4xl font-extrabold text-gray-900">₦{{ "%.2f"|format(plan.price) }}<span class="text-lg">/month</span></span>
+            {% endif %}
+          </div>
+          <ul class="space-y-3 mb-8">
+            {% for feature in plan.features.split(',') | map('trim') %}
+              <li class="flex items-center text-gray-600">
+                <i class="fas fa-check text-green-500 mr-2"></i>
+                {{ feature }}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if plan.is_free %}
+            <!-- Button for free plan -->
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('user_dashboard') }}" class="block w-full py-3 text-center bg-gray-200 text-gray-800 font-bold rounded-lg
+                                       hover:bg-gray-300 transition duration-300">
+                  Manage Account
+                </a>
+            {% else %}
+                <a href="/form" class="block w-full py-3 text-center bg-gray-200 text-gray-800 font-bold rounded-lg
+                                       hover:bg-gray-300 transition duration-300">
+                  Get Started
+                </a>
+            {% endif %}
+          {% else %}
+            <!-- Button for paid plans -->
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('user_dashboard') }}#subscriptions" class="block w-full py-3 text-center bg-red-500 text-white font-bold rounded-lg
+                                               hover:bg-red-600 transform hover:scale-105 transition-all duration-300">
+                  Subscribe Now
+                </a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="block w-full py-3 text-center bg-red-500 text-white font-bold rounded-lg
+                                               hover:bg-red-600 transform hover:scale-105 transition-all duration-300">
+                  Subscribe Now
+                </a>
+            {% endif %}
+          {% endif %}
         </div>
-        <ul class="space-y-3 mb-8">
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Single risk assessment</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> General health tips</li>
-          <li class="flex items-center text-gray-400"><i class="fas fa-times text-gray-300 mr-2"></i> Historical tracking</li>
-        </ul>
-        <a href="/form" class="block w-full py-3 text-center bg-gray-200 text-gray-800 font-bold rounded-lg
-                               hover:bg-gray-300 transition duration-300">
-          Get Started
-        </a>
-      </div>
-
-      <!-- Pro (Popular) -->
-      <div class="bg-white p-8 rounded-xl border-4 border-red-500 relative
-                  hover:shadow-2xl transform hover:scale-105 transition-all duration-500"
-           data-aos="fade-up" data-aos-delay="200">
-        <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2
-                    bg-red-500 text-white text-xs font-bold px-4 py-1 rounded-full animate-pulse">
-          Most Popular
-        </div>
-        <h3 class="text-2xl font-bold text-gray-800 mb-4">{{ 'Pro' }}</h3>
-        <div class="mb-6">
-          <span class="text-4xl font-extrabold text-gray-900">$9<span class="text-lg">/month</span></span>
-        </div>
-        <ul class="space-y-3 mb-8">
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Unlimited assessments</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Personalized health plan</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Historical trend analysis</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Priority email support</li>
-        </ul>
-        <a href="/subscribe/pro" class="block w-full py-3 text-center bg-red-500 text-white font-bold rounded-lg
-                                       hover:bg-red-600 transform hover:scale-105 transition-all duration-300">
-          Subscribe Now
-        </a>
-      </div>
-
-      <!-- Premium -->
-      <div class="bg-gray-50 p-8 rounded-xl border border-gray-200
-                  hover:shadow-xl transition-all duration-300"
-           data-aos="fade-up" data-aos-delay="300">
-        <h3 class="text-2xl font-bold text-gray-800 mb-4">{{ 'Premium' }}</h3>
-        <div class="mb-6">
-          <span class="text-4xl font-extrabold text-gray-900">$19<span class="text-lg">/month</span></span>
-        </div>
-        <ul class="space-y-3 mb-8">
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Everything in Pro</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> Monthly health reports</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> AI-powered lifestyle coaching</li>
-          <li class="flex items-center text-gray-600"><i class="fas fa-check text-green-500 mr-2"></i> 24/7 chat support</li>
-        </ul>
-        <a href="/subscribe/premium" class="block w-full py-3 text-center bg-gray-800 text-white font-bold rounded-lg
-                                           hover:bg-black transition duration-300">
-          Go Premium
-        </a>
-      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -232,11 +227,11 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="flex flex-wrap justify-center items-center gap-8 md:gap-12">
       {% for logo in ['Visa', 'Mastercard', 'PayPal', 'American Express', 'Stripe'] %}
         <img
-          src="{% if logo == 'Visa' %}  https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/240px-Visa_Inc._logo.svg.png
-              {% elif logo == 'Mastercard' %}https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/240px-Mastercard-logo.svg.png
-              {% elif logo == 'PayPal' %}https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/PayPal.svg/240px-PayPal.svg.png
-              {% elif logo == 'American Express' %}data:image/png;base64,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
-              {% elif logo == 'Stripe' %}https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Stripe_Logo%2C_revised_2016.svg/240px-Stripe_Logo%2C_revised_2016.svg.png
+          src="{% if logo == 'Visa' %}    https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/240px-Visa_Inc._logo.svg.png  
+              {% elif logo == 'Mastercard' %}https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/240px-Mastercard-logo.svg.png  
+              {% elif logo == 'PayPal' %}https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/PayPal.svg/240px-PayPal.svg.png  
+              {% elif logo == 'American Express' %}data:image/png;base64,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
+              {% elif logo == 'Stripe' %}https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Stripe_Logo%2C_revised_2016.svg/240px-Stripe_Logo%2C_revised_2016.svg.png  
               {% endif %}"
           alt="{{ logo }}"
           class="h-10 grayscale hover:grayscale-0 transition-all duration-500 transform hover:scale-125"
@@ -262,8 +257,8 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {% for name, img, quote in [
         ('Michael Johnson', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80', "This tool helped me realize I needed to make lifestyle changes before it was too late."),
-        ('Sarah Williams', '  https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80', "As a doctor, I appreciate the scientific approach behind this tool."),
-        ('David Chen', '  https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80', "The early warning gave me time to consult with my doctor.")
+        ('Sarah Williams', '    https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80', "As a doctor, I appreciate the scientific approach behind this tool."),
+        ('David Chen', '    https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80', "The early warning gave me time to consult with my doctor.")
       ] %}
       <div class="bg-gray-50 p-6 rounded-xl border border-gray-200
                   hover:shadow-xl hover:-translate-y-2 transition-all duration-500"
