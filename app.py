@@ -650,8 +650,8 @@ def login():
                 try:
                     if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                         session.clear()
-                        session["id"] = user.get("id")
-                        session["name"] = user.get("name")
+                        session["user_id"] = user.get("id")
+                        session["user_name"] = user.get("name")
 
                         # --- STEP 1A: Detect Role ---
                         # Default role is 'user', unless doctor or admin
@@ -662,7 +662,7 @@ def login():
                             doctor_check = supabase.table("doctors").select("id").eq("id", user["id"]).execute()
                             if doctor_check.data:
                                 role = "doctor"
-                                session["id"] = doctor_check.data[0]["id"]
+                                session["doctor_id"] = doctor_check.data[0]["id"]
 
                         session["role"] = role
 
@@ -691,9 +691,9 @@ def login():
 
                 if stored_hash and bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                     session.clear()
-                    session["id"] = admin.get("id")
+                    session["user_id"] = admin.get("id")
                     session["role"] = "admin"
-                    session["name"] = admin.get("name")
+                    session["user_name"] = admin.get("name")
                     flash("Welcome back, Admin!", "success")
                     return redirect(url_for("admin_dashboard"))
         except Exception as e:
