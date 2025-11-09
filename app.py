@@ -436,6 +436,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 def get_user_role(user_id):
     """Helper to fetch user role from Supabase."""
     try:
@@ -445,27 +446,43 @@ def get_user_role(user_id):
         print(f"Error fetching role for user {user_id}: {e}")
         return "user"
 
+
 def get_user_subscription_status(user_id):
-    """Helper to fetch user's current subscription status from Supabase."""
+    """
+    Helper to fetch user's current subscription status from Supabase.
+    Admin users are automatically considered unrestricted (active and paid).
+    """
     try:
-        # Get the most recent active subscription for the user
-        # Sort by start_date descending to get the latest one first
-        subs_data = supabase.table("user_subscriptions").select(
-            "status, subscription_plans(name, is_free)"
-        ).eq("user_id", user_id).neq("status", "cancelled").order("start_date", desc=True).execute()
+        # Step 1: Check if user is admin first
+        role = get_user_role(user_id)
+        if role == "admin":
+            # Admins should have full access even without a subscription
+            return "active", False
+
+        # Step 2: For normal users, fetch actual subscription
+        subs_data = (
+            supabase.table("user_subscriptions")
+            .select("status, subscription_plans(name, is_free)")
+            .eq("user_id", user_id)
+            .neq("status", "cancelled")
+            .order("start_date", desc=True)
+            .execute()
+        )
         
         if subs_data.data:
             latest_sub = subs_data.data[0]
             plan_info = latest_sub.get("subscription_plans", {})
-            is_free_plan = plan_info.get("is_free", True) # Assume free if no plan found or is_free flag missing
+            is_free_plan = plan_info.get("is_free", True)
             return latest_sub["status"], is_free_plan
         else:
             # No active subscriptions found, default to free
             return "inactive", True
+
     except Exception as e:
         print(f"Error fetching subscription for user {user_id}: {e}")
-        # If there's an error fetching, default to safest option (free/restricted)
+        # Default to safest option (free/restricted)
         return "inactive", True
+
 
 
 def handle_supabase_auth_session(session_data):
@@ -1390,7 +1407,7 @@ def user_dashboard():
         else:
             labels, scores = [], []
 
-        # --- NEW: Fetch user subscriptions ---
+        # --- Fetch user subscriptions ---
         user_subscriptions = supabase.table("user_subscriptions").select(
             "*, subscription_plans(name, price, duration_days, is_free)"
         ).eq("user_id", user_id).execute().data
