@@ -25,7 +25,7 @@ import time
 import json
 import requests
 import markdown
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Tuple, Optional
 from groq import Groq
 from supabase import create_client, Client
@@ -645,117 +645,467 @@ def chat():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        name = request.form["name"]
-        email = request.form["email"].lower()
-        password = request.form["password"]
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        role = request.form.get("role", "user").strip().lower()  # expected: 'user', 'doctor' (or admin via admin UI)
 
-        # Hash the password using bcrypt
-        hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-        # Check if user already exists
-        existing = supabase.table("users").select("id").eq("email", email).execute()
-        if existing.data:
-            flash("Email already registered.", "danger")
+        if not name or not email or not password:
+            flash("Please fill in all required fields.", "danger")
             return redirect(url_for("register"))
 
-        # Insert new user
-        supabase.table("users").insert({
-            "name": name,
-            "email": email,
-            "password_hash": hashed_pw
-        }).execute()
+        # Check if user exists
+        try:
+            existing = supabase.table("users").select("id, email").eq("email", email).execute()
+            if existing and existing.data:
+                flash("Email already registered. Try logging in.", "warning")
+                return redirect(url_for("login"))
+        except Exception as e:
+            print("Supabase check error:", e)
+            flash("Registration currently unavailable. Try again later.", "danger")
+            return redirect(url_for("register"))
+
+        # Hash password with bcrypt
+        hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        # Create user in users table (role included)
+        try:
+            res = supabase.table("users").insert({
+                "name": name,
+                "email": email,
+                "password_hash": hashed_pw,
+                "role": role
+            }).execute()
+            # extract created user id if available
+            new_user = res.data[0] if res and res.data else None
+        except Exception as e:
+            print("Supabase insert user error:", e)
+            flash("Failed to create account. Try again later.", "danger")
+            return redirect(url_for("register"))
+
+        # If doctor, create doctor profile row
+        try:
+            if role == "doctor":
+                user_id = new_user.get("id") if new_user else None
+                if user_id:
+                    supabase.table("doctors").insert({
+                        "user_id": user_id,
+                        "specialization": request.form.get("specialization", "General Cardiology"),
+                        "bio": request.form.get("bio", ""),
+                        "consultation_fee": float(request.form.get("consultation_fee", 0))
+                    }).execute()
+        except Exception as e:
+            print("Warning: failed to create doctor profile:", e)
 
         flash("Account created successfully. Please log in.", "success")
         return redirect(url_for("login"))
 
+    # GET
     return render_template("register.html")
+
+@app.route("/doctor/availability", methods=["GET", "POST"])
+def doctor_availability():
+    if session.get("role") != "doctor":
+        flash("Doctor access only.", "warning")
+        return redirect(url_for("login"))
+
+    user_id = session.get("user_id")
+    # find doctor record
+    doctor_data = supabase.table("doctors").select("id").eq("user_id", user_id).single().execute()
+    if not doctor_data.data:
+        flash("Doctor profile not found.", "danger")
+        return redirect(url_for("doctor_dashboard"))
+
+    doctor_id = doctor_data.data["id"]
+
+    if request.method == "POST":
+        date_str = request.form.get("available_date")
+        start_time = request.form.get("start_time")
+        end_time = request.form.get("end_time")
+
+        try:
+            available_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            supabase.table("doctor_availability").insert({
+                "doctor_id": doctor_id,
+                "available_date": str(available_date),
+                "start_time": start_time,
+                "end_time": end_time
+            }).execute()
+            flash("Availability added successfully.", "success")
+        except Exception as e:
+            print("Error adding availability:", e)
+            flash("Failed to add availability.", "danger")
+
+        return redirect(url_for("doctor_availability"))
+
+    # GET request
+    slots = supabase.table("doctor_availability").select("*").eq("doctor_id", doctor_id).order("available_date").execute().data
+    return render_template("doctor_availability.html", slots=slots)
+
+@app.route("/book", methods=["GET", "POST"])
+def book_appointment():
+    if session.get("role") != "user":
+        flash("Login as a user to book an appointment.", "warning")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        slot_id = request.form.get("slot_id")
+
+        # Fetch slot
+        slot_data = supabase.table("doctor_availability").select("*").eq("id", slot_id).single().execute()
+        if not slot_data.data:
+            flash("Invalid slot selected.", "danger")
+            return redirect(url_for("book_appointment"))
+
+        slot = slot_data.data
+        if slot.get("is_booked"):
+            flash("This slot has already been booked.", "danger")
+            return redirect(url_for("book_appointment"))
+
+        # Create appointment
+        doctor_id = slot["doctor_id"]
+        user_id = session.get("user_id")
+        dt_str = f"{slot['available_date']} {slot['start_time']}"
+        appointment_time = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+
+        supabase.table("appointments").insert({
+            "user_id": user_id,
+            "doctor_id": doctor_id,
+            "appointment_time": appointment_time.isoformat(),
+            "status": "pending"
+        }).execute()
+
+        # Mark slot as booked
+        supabase.table("doctor_availability").update({"is_booked": True}).eq("id", slot_id).execute()
+
+        flash("Appointment booked successfully!", "success")
+        return redirect(url_for("user_dashboard"))
+
+    # GET: get all available slots
+    available_slots = supabase.table("doctor_availability").select(
+        "id, doctor_id, available_date, start_time, end_time"
+    ).eq("is_booked", False).execute().data
+
+    doctors_data = supabase.table("doctors").select("id, specialization, bio").execute().data
+    doctor_lookup = {d["id"]: d for d in doctors_data}
+
+    # Build a frontend-friendly JSON object for JavaScript
+    formatted_slots = []
+    formatted_slots.extend(
+        {
+            "id": s["id"],
+            "doctor_id": s["doctor_id"],
+            "doctor": doctor_lookup.get(s["doctor_id"], {}).get(
+                "specialization", "Unknown"
+            ),
+            "date": s["available_date"],
+            "start": s["start_time"],
+            "end": s["end_time"],
+        }
+        for s in available_slots
+    )
+    return render_template("book_appointment.html", slots=formatted_slots)
+
+@app.route("/my-bookings")
+def my_bookings():
+    if session.get("role") != "user":
+        flash("Login as user to view your bookings.", "warning")
+        return redirect(url_for("login"))
+
+    user_id = session.get("user_id")
+
+    appointments = supabase.table("appointments").select(
+        "id, appointment_time, status, doctor_id"
+    ).eq("user_id", user_id).order("appointment_time", desc=True).execute().data
+
+    doctor_lookup = {}
+    try:
+        if doctor_ids := list({a["doctor_id"] for a in appointments}):
+            doctors = supabase.table("doctors").select("id, specialization").in_("id", doctor_ids).execute().data
+            doctor_lookup = {d["id"]: d for d in doctors}
+    except Exception as e:
+        print("Doctor fetch error:", e)
+
+    return render_template("my_bookings.html", appointments=appointments, doctors=doctor_lookup)
+
 
 # ================================
 # 📊 DASHBOARD
 # ================================
-@app.route("/user/dashboard")
-def user_dashboard():
-    if session.get("role") != "user":
+
+@app.route("/doctor/dashboard")
+def doctor_dashboard():
+    # Check if user is logged in as a doctor
+    if session.get("role") != "doctor":
+        flash("Access denied. Doctors only.", "danger")
         return redirect(url_for("login"))
 
     user_id = session.get("user_id")
-    user_data = supabase.table("users").select("name, email").eq("id", user_id).execute().data[0]
-    records = supabase.table("records").select("*").eq("user_id", user_id).order("created_at", desc=True).execute().data
+    doctor_id = session.get("doctor_id") # Assuming this is set during login for doctors
 
-    # Prepare data for charts
-    if records:
-        labels = [r["created_at"][:10] for r in records]
-        scores = [r["health_score"] for r in records]
-    else:
-        labels, scores = [], []
+    # If doctor_id isn't in session, fetch it from the doctors table
+    if not doctor_id:
+        try:
+            doc_data = supabase.table("doctors").select("id").eq("user_id", user_id).single().execute()
+            if doc_data and doc_data.data:
+                doctor_id = doc_data.data["id"]
+                session["doctor_id"] = doctor_id # Store for future use in this session
+            else:
+                flash("Doctor profile not found. Please contact support.", "danger")
+                return redirect(url_for("login"))
+        except Exception as e:
+            print(f"Error fetching doctor ID: {e}")
+            flash("Error accessing dashboard. Please try again later.", "danger")
+            return redirect(url_for("login"))
+
+    try:
+        # Fetch doctor profile details (name, email, bio, specialization from users and doctors tables)
+        user_data = supabase.table("users").select("name, email").eq("id", user_id).single().execute().data
+        doctor_details = supabase.table("doctors").select("bio, specialization, consultation_fee").eq("id", doctor_id).single().execute().data
+        # Combine user and doctor data
+        profile_info = {**user_data, **doctor_details}
+
+        # Fetch availability slots for this doctor
+        availability_slots = supabase.table("doctor_availability").select("*").eq("doctor_id", doctor_id).order("available_date").execute().data
+
+        # Fetch booked appointments for this doctor
+        booked_appointments = supabase.table("appointments").select("id, user_id, appointment_time, status").eq("doctor_id", doctor_id).order("appointment_time").execute().data
+
+        # Optionally, fetch user details for the booked appointments
+        user_ids_needed = [appt["user_id"] for appt in booked_appointments]
+        patient_details = {}
+        if user_ids_needed:
+             users_info = supabase.table("users").select("id, name, email").in_("id", user_ids_needed).execute().data
+             patient_details = {u["id"]: u for u in users_info}
+
+    except Exception as e:
+        print(f"Error fetching doctor dashboard data: {e}")
+        flash("Error loading dashboard data. Please try again later.", "danger")
+        return redirect(url_for("login")) # Or render a partial template
+
+    return render_template(
+        "doctor_dashboard.html",
+        profile=profile_info,
+        availability_slots=availability_slots,
+        booked_appointments=booked_appointments,
+        patient_details=patient_details
+    )
+
+
+@app.route("/user/dashboard")
+def user_dashboard():
+    if session.get("role") != "user":
+        flash("Access denied. Users only.", "danger")
+        return redirect(url_for("login"))
+
+    user_id = session.get("user_id")
+    try:
+        user_data = supabase.table("users").select("name, email").eq("id", user_id).single().execute().data
+        # Fetch user's health records if applicable
+        records = supabase.table("records").select("*").eq("user_id", user_id).order("created_at", desc=True).execute().data
+
+        # Fetch user's booked appointments
+        appointments = supabase.table("appointments").select(
+            "id, doctor_id, appointment_time, status"
+        ).eq("user_id", user_id).order("appointment_time", desc=True).execute().data
+
+        # Fetch doctor details for the appointments
+        doctor_ids_needed = [appt["doctor_id"] for appt in appointments]
+        doctor_details = {}
+        if doctor_ids_needed:
+            doctors_info = supabase.table("doctors").select("id, specialization").in_("id", doctor_ids_needed).execute().data
+            doctors_lookup = {d["id"]: d for d in doctors_info}
+            users_info = supabase.table("users").select("id, name").in_("id", doctor_ids_needed).execute().data
+            users_lookup = {u["id"]: u for u in users_info}
+            # Combine doctor and user details
+            for appt in appointments:
+                doc_id = appt["doctor_id"]
+                doc_info = doctors_lookup.get(doc_id, {})
+                user_info = users_lookup.get(doc_id, {})
+                doctor_details[doc_id] = {**doc_info, **user_info} # e.g., {'specialization': 'Cardiology', 'name': 'Dr. Smith'}
+
+        # Prepare data for charts (example remains the same)
+        if records:
+            labels = [r["created_at"][:10] for r in records]
+            scores = [r["health_score"] for r in records]
+        else:
+            labels, scores = [], []
+
+    except Exception as e:
+        print(f"Error fetching user dashboard data: {e}")
+        flash("Error loading dashboard data. Please try again later.", "danger")
+        return redirect(url_for("login")) # Or render a partial template
 
     return render_template(
         "user_dashboard.html",
         user=user_data,
         records=records,
         chart_labels=json.dumps(labels),
-        chart_scores=json.dumps(scores)
+        chart_scores=json.dumps(scores),
+        appointments=appointments, # Pass appointments to the template
+        doctor_details=doctor_details # Pass doctor details for the template
     )
 
 
 @app.route("/admin/dashboard")
 def admin_dashboard():
     if session.get("role") != "admin":
+        flash("Access denied. Admins only.", "danger")
         return redirect(url_for("login"))
 
-    total_users = len(supabase.table("users").select("id").execute().data)
-    total_records = len(supabase.table("records").select("id").execute().data)
-    total_chats = len(supabase.table("chat_logs").select("id").execute().data)
-    admins = supabase.table("admins").select("name, email").execute().data
+    try:
+        # Fetch core counts
+        total_users = len(supabase.table("users").select("id").execute().data)
+        total_doctors = len(supabase.table("doctors").select("id").execute().data)
+        total_admins = len(supabase.table("admins").select("id").execute().data)
+        total_records = len(supabase.table("records").select("id").execute().data)
+        total_chats = len(supabase.table("chat_logs").select("id").execute().data)
+        total_appointments = len(supabase.table("appointments").select("id").execute().data)
+        # Fetch counts for different appointment statuses
+        appointment_statuses = supabase.table("appointments").select("status").execute().data
+        status_counts = {}
+        for appt in appointment_statuses:
+            status = appt.get("status", "Unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
 
-    # Aggregate data for chart (records by consultation type)
-    record_data = supabase.table("records").select("consultation_type").execute().data
-    type_count = {}
-    for r in record_data:
-        ctype = r.get("consultation_type", "Unknown")
-        type_count[ctype] = type_count.get(ctype, 0) + 1
+        # Fetch admin details
+        admins = supabase.table("admins").select("name, email").execute().data
+
+        # Aggregate data for chart (records by consultation type)
+        record_data = supabase.table("records").select("consultation_type").execute().data
+        type_count = {}
+        for r in record_data:
+            ctype = r.get("consultation_type", "Unknown")
+            type_count[ctype] = type_count.get(ctype, 0) + 1
+
+        # Aggregate data for user role chart (if roles are stored in users table)
+        user_roles = supabase.table("users").select("role").execute().data
+        role_counts = {}
+        for user in user_roles:
+            role = user.get("role", "user") # Default to 'user' if role is missing
+            role_counts[role] = role_counts.get(role, 0) + 1
+
+        # --- NEW: Activity Chart Data ---
+        # Example: Fetch user registrations over time (last 6 months)
+        # Get the date 6 months ago
+        six_months_ago = datetime.now(timezone.utc) - timedelta(days=6*30)
+        six_months_ago_str = six_months_ago.strftime('%Y-%m-%d')
+
+        # Fetch user creation dates within the last 6 months
+        user_registrations_raw = supabase.table("users").select("created_at").gte("created_at", six_months_ago_str).execute().data
+        # Extract just the date part and count occurrences
+        registration_dates = [user["created_at"][:10] for user in user_registrations_raw]
+        from collections import Counter
+        registration_counts = Counter(registration_dates)
+        # Sort the dates for the chart
+        sorted_dates = sorted(registration_counts.keys())
+        registration_counts_list = [registration_counts[date] for date in sorted_dates]
+
+        # Example: Fetch appointment counts over time (last 6 months)
+        appointment_counts_raw = supabase.table("appointments").select("appointment_time").gte("appointment_time", six_months_ago_str).execute().data
+        appointment_dates = [appt["appointment_time"][:10] for appt in appointment_counts_raw]
+        appointment_counts = Counter(appointment_dates)
+        sorted_appt_dates = sorted(appointment_counts.keys())
+        appointment_counts_list = [appointment_counts[date] for date in sorted_appt_dates]
+
+        # Prepare labels for the chart (using the sorted unique dates)
+        activity_labels = sorted(set(sorted_dates + sorted_appt_dates)) # Combine and sort unique dates
+        # Prepare data for user registrations, aligning with activity_labels
+        user_activity_data = [registration_counts.get(date, 0) for date in activity_labels]
+        # Prepare data for appointments, aligning with activity_labels
+        appt_activity_data = [appointment_counts.get(date, 0) for date in activity_labels]
+
+    except Exception as e:
+        print(f"Error fetching admin dashboard data: {e}")
+        flash("Error loading dashboard data. Please try again later.", "danger")
+        return redirect(url_for("admin_dashboard")) # Or render a partial template
 
     return render_template(
         "admin_dashboard.html",
         total_users=total_users,
+        total_doctors=total_doctors,
+        total_admins=total_admins,
         total_records=total_records,
         total_chats=total_chats,
+        total_appointments=total_appointments,
         admins=admins,
         record_type_labels=json.dumps(list(type_count.keys())),
-        record_type_counts=json.dumps(list(type_count.values()))
+        record_type_counts=json.dumps(list(type_count.values())),
+        user_role_labels=json.dumps(list(role_counts.keys())),
+        user_role_counts=json.dumps(list(role_counts.values())),
+        appointment_status_labels=json.dumps(list(status_counts.keys())),
+        appointment_status_counts=json.dumps(list(status_counts.values())),
+        # Pass activity chart data
+        activity_labels=json.dumps(activity_labels),
+        user_activity_data=json.dumps(user_activity_data),
+        appt_activity_data=json.dumps(appt_activity_data)
     )
 
 
+# -------------------
+# Login route
+# -------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"].lower()
-        password = request.form["password"].encode("utf-8")
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
 
-        # Try user first
-        user_data = supabase.table("users").select("*").eq("email", email).execute()
-        if user_data.data:
-            user = user_data.data[0]
-            stored_hash = user["password_hash"].encode("utf-8")
-            if bcrypt.checkpw(password, stored_hash):
-                session["user_id"] = user["id"]
-                session["role"] = "user"
-                flash("Welcome to CardioConsult!", "success")
-                return redirect(url_for("user_dashboard"))
+        if not email or not password:
+            flash("Provide both email and password", "warning")
+            return redirect(url_for("login"))
 
-        # Try admin next
-        admin_data = supabase.table("admins").select("*").eq("email", email).execute()
-        if admin_data.data:
-            admin = admin_data.data[0]
-            stored_hash = admin["password_hash"].encode("utf-8")
-            if bcrypt.checkpw(password, stored_hash):
-                session["admin_id"] = admin["id"]
-                session["role"] = "admin"
-                flash("Admin login successful!", "success")
-                return redirect(url_for("admin_dashboard"))
+        # 1) Try to authenticate against users table (role-aware)
+        try:
+            user_resp = supabase.table("users").select("*").eq("email", email).limit(1).execute()
+        except Exception as e:
+            print("Supabase query error:", e)
+            flash("Login temporarily unavailable. Try later.", "danger")
+            return redirect(url_for("login"))
+
+        if user_resp and user_resp.data:
+            user = user_resp.data[0]
+            stored_hash = user.get("password_hash")
+            if stored_hash:
+                # stored_hash expected to be bcrypt style e.g. $2b$...
+                try:
+                    if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
+                        session.clear()
+                        session["user_id"] = user.get("id")
+                        session["role"] = user.get("role", "user")
+                        session["user_name"] = user.get("name")
+                        # redirect based on role
+                        if session["role"] == "admin":
+                            return redirect(url_for("admin_dashboard"))
+                        elif session["role"] == "doctor":
+                            return redirect(url_for("doctor_dashboard"))  # you'll create route
+                        else:
+                            return redirect(url_for("user_dashboard"))
+                except ValueError as e:
+                    # Bad stored hash format
+                    print("Password check error (hash format):", e)
+                    flash("Authentication error (password format). Contact admin.", "danger")
+                    return redirect(url_for("login"))
+
+        # 2) If not found in users or bad password, try admins table (if you keep it separate)
+        try:
+            admin_resp = supabase.table("admins").select("*").eq("email", email).limit(1).execute()
+            if admin_resp and admin_resp.data:
+                admin = admin_resp.data[0]
+                stored_hash = admin.get("password_hash")
+                if stored_hash and bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
+                    session.clear()
+                    session["admin_id"] = admin.get("id")
+                    session["role"] = "admin"
+                    session["user_name"] = admin.get("name")
+                    return redirect(url_for("admin_dashboard"))
+        except Exception as e:
+            print("Supabase admin lookup error:", e)
 
         flash("Invalid email or password", "danger")
+        return redirect(url_for("login"))
 
+    # GET
     return render_template("login.html")
 
 
