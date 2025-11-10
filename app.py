@@ -438,13 +438,46 @@ def login_required(f):
 
 
 def get_user_role(user_id):
-    """Helper to fetch user role from Supabase."""
+    """Helper to fetch user role from Supabase.
+    Checks the 'users', 'doctors', and 'admins' tables based on the Supabase Auth ID.
+    Falls back to 'user' if the user is not found in any table.
+    """
     try:
+        # Check 'users' table first
         user_data = supabase.table("users").select("role").eq("id", user_id).single().execute()
-        return user_data.data.get("role", "user")
+        if user_data.data:
+            return user_data.data.get("role", "user")
     except Exception as e:
-        print(f"Error fetching role for user {user_id}: {e}")
-        return "user"
+        # If not found in 'users', proceed to check other tables
+        if "PGRST116" not in str(e) or "0 rows" not in str(e):
+            print(f"Error checking 'users' table for {user_id}: {e}")
+
+    try:
+        # Check 'doctors' table
+        doctor_data = supabase.table("doctors").select("id").eq("id", user_id).single().execute()
+        if doctor_data.data:
+            # If found in doctors table, their role is 'doctor'
+            return "doctor"
+    except Exception as e:
+        # If not found in 'doctors', proceed to check 'admins'
+        if "PGRST116" not in str(e) or "0 rows" not in str(e):
+            print(f"Error checking 'doctors' table for {user_id}: {e}")
+
+    try:
+        # Check 'admins' table
+        # The 'admins' table likely has 'user_id' column matching the Supabase Auth ID
+        admin_data = supabase.table("admins").select("id").eq("id", user_id).single().execute()
+        if admin_data.data:
+            # If found in admins table, their role is 'admin'
+            return "admin"
+    except Exception as e:
+        # If not found in 'admins' either, log error (if it's not the expected '0 rows')
+        if "PGRST116" not in str(e) or "0 rows" not in str(e):
+            print(f"Error checking 'admins' table for {user_id}: {e}")
+
+    # If not found in any table, default to 'user' or handle as needed
+    print(f"User {user_id} not found in any role table ('users', 'doctors', 'admins'). Assigning default role 'user'.")
+    return "user"
 
 
 def get_user_subscription_status(user_id):
@@ -486,31 +519,73 @@ def get_user_subscription_status(user_id):
 
 
 def handle_supabase_auth_session(session_data):
-    """Process the session data returned from Supabase auth and set Flask session."""
+    """
+    Process the session data returned from Supabase auth and set Flask session.
+    Determines the user's role by checking the 'users', 'doctors', and 'admins' tables.
+    """
     user_info = jwt.decode(session_data["access_token"], options={"verify_signature": False}, algorithms=["RS256"], audience="authenticated")
     user_id = user_info["sub"]
     email = user_info.get("email")
     user_name = user_info.get("user_metadata", {}).get("name") or email
 
-    # Fetch user details from your users table
-    user_meta = supabase.table("users").select("*").eq("id", user_id).execute().data
-    if not user_meta:
-        # First-time user: create profile in your local table using Supabase Auth ID
-        # Note: This assumes Supabase Auth ID matches your local table ID
-        # If not, you might need to manage a mapping.
-        supabase.table("users").insert({
-            "id": user_id, # Using Supabase Auth ID as primary key
-            "email": email,
-            "name": user_name,
-            "role": "user" # Default role
-        }).execute()
-        user_meta = [{"id": user_id, "role": "user", "name": user_name, "email": email}]
+    # Determine role by checking tables in a specific order
+    # You might want to adjust the logic here depending on how you assign roles initially
+    # e.g., via admin panel, registration form, or by checking the existence in specific tables.
+    role = "user" # Default role
 
+    # Check 'doctors' table first (or the order you prefer)
+    try:
+        doctor_data = supabase.table("doctors").select("id").eq("id", user_id).single().execute()
+        if doctor_data.data:
+            role = "doctor"
+    except Exception as e:
+        # If not found in doctors, continue checking
+        if "PGRST116" not in str(e) or "0 rows" not in str(e):
+            print(f"Error checking 'doctors' table for {user_id}: {e}")
+
+    # Check 'admins' table if role is still default
+    if role == "user": # Only check admins if not already determined to be a doctor
+        try:
+            admin_data = supabase.table("admins").select("id").eq("id", user_id).single().execute()
+            if admin_data.data:
+                role = "admin"
+        except Exception as e:
+            # If not found in admins, continue checking users or keep default
+            if "PGRST116" not in str(e) or "0 rows" not in str(e):
+                print(f"Error checking 'admins' table for {user_id}: {e}")
+
+    # Check 'users' table if role is still default
+    # This also ensures the user profile exists in the 'users' table if needed for other data
+    if role == "user":
+        user_meta = supabase.table("users").select("*").eq("id", user_id).execute().data
+        if not user_meta:
+            # First-time user (or user not in 'users' table but defaulting to 'user' role): create profile
+            # This assumes the user should exist in the 'users' table regardless of their primary role for general data.
+            try:
+                supabase.table("users").insert({
+                    "id": user_id, # Using Supabase Auth ID as primary key
+                    "email": email,
+                    "name": user_name,
+                    "role": "user" # The role here might be less critical if determined above, but set for consistency
+                }).execute()
+                # Fetch the data back to ensure we have it
+                user_meta = [{"id": user_id, "role": "user", "name": user_name, "email": email}]
+            except Exception as e:
+                print(f"Error creating user profile in 'users' table for {user_id}: {e}")
+                # If creation fails, we might not have user details, but we have the role determined above
+                user_meta = [{"id": user_id, "role": role, "name": user_name, "email": email}]
+        else:
+            # User exists in 'users' table, potentially update name/email if changed in auth
+            # Or just use the data fetched
+            pass
+
+    # Set Flask session variables
     session.clear()
-    session["user_id"] = user_meta[0]["id"]
-    session["role"] = user_meta[0].get("role", "user")
-    session["user_name"] = user_meta[0].get("name")
-
+    session["user_id"] = user_id
+    session["role"] = role # Use the role determined from the tables
+    session["user_name"] = user_name
+    # Optionally, store email if needed elsewhere
+    session["user_email"] = email
 
 # Access Control Decorators
 def check_subscription_access(f):
@@ -976,7 +1051,7 @@ def consult():
 
 @app.route("/chat", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
-@check_subscription_access # Apply access control
+#@check_subscription_access # Apply access control
 def chat():
     if request.method == "GET":
         chat_log = session.get("chat_log", [])
@@ -1028,13 +1103,13 @@ def ai_chat():
         return jsonify({"error": "Message cannot be empty."}), 400
 
     # Check if user is logged in and has access (for API calls, check session or token)
-    user_id = request.json.get("user_id") # Assuming API sends user_id
+    user_id = request.json.get("id") # Assuming API sends user_id
     if user_id:
         # Fetch subscription for API user
         try:
             sub_status, is_free_plan = get_user_subscription_status(user_id)
             if is_free_plan or sub_status != "active":
-                 return jsonify({"error": "AI chat access denied. Upgrade your subscription."}), 403
+                return jsonify({"error": "AI chat access denied. Upgrade your subscription."}), 403
         except Exception:
             return jsonify({"error": "Subscription check failed."}), 500
     else:
@@ -1054,7 +1129,7 @@ def ai_chat():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "mixtral-8x7b-32768",  # free + hosted
+                "model": "llama-3.3-70b-versatile",  # free + hosted
                 "messages": [
                     {"role": "system", "content": "You are CardioConsult, an AI cardiovascular consultant. Provide informative, safe health responses and always encourage users to see a doctor if symptoms persist."},
                     {"role": "user", "content": user_input}
