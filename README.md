@@ -1,6 +1,6 @@
 # CardioGuard — Heart Disease & Lifestyle Risk Predictor (Dual-Model Flask App)
 
-**HeartPredict** is a polished, production-ready Flask web application that performs **two types of cardiovascular risk predictions**:
+**CardioGuard** is a polished, production-ready Flask web application that performs **two types of cardiovascular risk predictions**:
 
 * **Clinical model** — trained on clinical features (Cleveland-style dataset).
 * **Lifestyle model** — trained on general / lifestyle features (`cardio_train.csv` style: height, weight, smoking, alcohol, activity, BP, etc.)
@@ -17,6 +17,9 @@ This repository contains the web app, training scripts, model artifacts, and UI 
   - [Repository structure](#repository-structure)
   - [Quickstart — Run Locally](#quickstart--run-locally)
   - [Model training \& artifacts](#model-training--artifacts)
+    - [Custom Trained Models](#custom-trained-models)
+    - [AI Model Integration (OpenAI, Groq)](#ai-model-integration-openai-groq)
+    - [AI Model Integration (AI Chat)](#ai-model-integration-ai-chat)
   - [Endpoints \& Input formats](#endpoints--input-formats)
   - [Deployment (Render) \& keep-alive](#deployment-render--keep-alive)
   - [Environment variables (`.env.example`)](#environment-variables-envexample)
@@ -27,9 +30,11 @@ This repository contains the web app, training scripts, model artifacts, and UI 
   - [Roadmap — Upcoming Features (planned)](#roadmap--upcoming-features-planned)
     - [User-facing](#user-facing)
     - [AI \& Advanced](#ai--advanced)
+  - [AI Tools Used in Development](#ai-tools-used-in-development)
   - [Contribution](#contribution)
   - [License \& Credits](#license--credits)
   - [Contact](#contact)
+  - [or use the Contact form on the Contact page](#or-use-the-contact-form-on-the-contact-page)
   - [Examples \& Quick Tips](#examples--quick-tips)
 
 ---
@@ -43,6 +48,9 @@ This repository contains the web app, training scripts, model artifacts, and UI 
 * Health endpoint for uptime monitors: `/health`.
 * Designed for Render deployment (Procfile + gunicorn ready).
 * Clear extension points for dashboards, subscriptions, payments, and AI assistants.
+* Integrated subscription management and payment processing.
+* Supabase-based authentication with email confirmation and OAuth (Google, Facebook, GitHub).
+* Access control based on subscription plans (free/paid).
 
 ---
 
@@ -50,7 +58,7 @@ This repository contains the web app, training scripts, model artifacts, and UI 
 
 ```
 heartpredict/
-├── app.py                      # Flask app (loads both models, routes, predict logic)
+├── app.py                      # Flask app (loads both models, routes, predict logic, auth, subscriptions)
 ├── train/
 │   ├── train_clinical.py       # (optional) training script for clinical model
 │   └── train_lifestyle.py      # (optional) training script for lifestyle model
@@ -68,6 +76,11 @@ heartpredict/
 │   ├── result.html
 │   ├── about.html
 │   ├── contact.html
+│   ├── user_dashboard.html
+│   ├── doctor_dashboard.html
+│   ├── admin_dashboard.html
+│   ├── pricing.html
+│   ├── subscribe_confirm.html
 │   └── resources.html
 ├── static/
 │   ├── assets/
@@ -86,7 +99,7 @@ heartpredict/
 1. **Clone the repo**
 
 ```bash
-git clone https://github.com/Miftau/CardioGuard
+git clone https://github.com/Miftau/CardioGuard  
 cd CardioGuard
 ```
 
@@ -112,7 +125,7 @@ pip install -r requirements.txt
 * `heart_rf_clinical.pkl`, `heart_scaler_clinical.pkl`, `heart_user_template_clinical.csv`
 * `heart_rf_lifestyle.pkl`, `heart_scaler_lifestyle.pkl`, `heart_user_template_lifestyle.csv`
 
-(If you don't have them, run the training scripts in `heart_disease_predictor.py` or contact the maintainer.)
+(If you don't have them, run the training scripts in `train/` or contact the maintainer.)
 
 5. **Create `.env`** (or copy `.env.example`) and add secrets (see below).
 
@@ -130,7 +143,7 @@ gunicorn app:app --bind 0.0.0.0:5000
 
 ## Model training & artifacts
 
-* Training scripts are placed in `heart_disease_predictor.py`. They produce:
+* Training scripts are placed in `train/`. They produce:
 
   * model `.pkl` (RandomForest or other)
   * scaler `.pkl` (StandardScaler)
@@ -139,6 +152,40 @@ gunicorn app:app --bind 0.0.0.0:5000
 
   * Clinical: `heart_rf_clinical.pkl`, `heart_scaler_clinical.pkl`, `heart_user_template_clinical.csv`
   * Lifestyle: `heart_rf_lifestyle.pkl`, `heart_scaler_lifestyle.pkl`, `heart_user_template_lifestyle.csv`
+
+### Custom Trained Models
+
+The application uses two custom-trained machine learning models to predict heart disease risk:
+
+1.  **Clinical Model (`heart_rf_clinical.pkl`)**:
+    *   **Purpose**: Trained on clinical features such as age, sex, chest pain type, resting blood pressure, cholesterol levels, fasting blood sugar, resting ECG results, maximum heart rate achieved, exercise-induced angina, ST depression, slope of the peak exercise ST segment, number of major vessels colored by fluoroscopy, and thalassemia. This model is designed for users who have access to detailed medical test results.
+    *   **Algorithm**: A `RandomForestClassifier` from scikit-learn, known for its robustness and ability to handle mixed data types.
+    *   **Preprocessing**: Input features are standardized using `StandardScaler` (`heart_scaler_clinical.pkl`) to ensure consistent performance across different scales of input data.
+    *   **Training Data**: `heart_disease_uci.csv` (or similar clinical dataset).
+    *   **Output**: Predicts the probability of heart disease presence (binary classification).
+
+2.  **Lifestyle Model (`heart_rf_lifestyle.pkl`)**:
+    *   **Purpose**: Trained on general lifestyle features like age, gender, height, weight, systolic and diastolic blood pressure, cholesterol levels, glucose levels, smoking status, alcohol consumption, and physical activity. This model is designed for users who want to assess risk based on general health and lifestyle habits.
+    *   **Algorithm**: A `RandomForestClassifier` from scikit-learn.
+    *   **Preprocessing**: Input features are standardized using `StandardScaler` (`heart_scaler_lifestyle.pkl`).
+    *   **Training Data**: `cardio_train.csv` (or similar lifestyle dataset).
+    *   **Output**: Predicts the probability of elevated cardiovascular risk (binary classification).
+
+### AI Model Integration (OpenAI, Groq)
+
+The application can optionally integrate with external AI services like OpenAI and Groq for advanced conversational features (e.g., the AI chat endpoint).
+
+*   **Configuration**: Set `OPENAI_API_KEY` or `GROQ_API_KEY` in your environment variables (`.env`).
+*   **Fallback**: If `GROQ_API_KEY` is set, it's preferred; otherwise, it falls back to OpenAI if `OPENAI_API_KEY` is available.
+*   **Usage**: The `/consult` endpoint and the `/api/chat` endpoint use these services to provide conversational, AI-powered responses based on user queries related to heart health.
+*   **System Prompt**: A customizable system prompt (`CHAT_SYSTEM_PROMPT` in `.env`) guides the AI's behavior (e.g., "You are CardioConsult...").
+
+### AI Model Integration (AI Chat)
+
+*   **Purpose**: The `/chat` endpoint provides a simple web-based chat interface.
+*   **Backend**: It uses the configured AI provider (Groq preferred, OpenAI fallback) via the `groq_client` or `openai` SDKs.
+*   **Session**: Chat history is maintained in the Flask session (`session["chat_log"]`) for the current user session.
+*   **Persistence**: Optionally, chat messages can be logged to Supabase (`chat_logs` table) if configured.
 
 **Training notes**
 
@@ -156,6 +203,12 @@ gunicorn app:app --bind 0.0.0.0:5000
 * `/predict` (POST) — receives form submission or CSV upload. Renders `result.html`.
 * `/result` — rendered by `/predict`. Not a direct endpoint (result page returned).
 * `/health` — returns `{"status": "ok"}` for uptime monitors.
+* `/user/dashboard` — user dashboard showing assessments, appointments, subscriptions.
+* `/doctor/dashboard` — doctor dashboard for managing availability and appointments.
+* `/admin/dashboard` — admin dashboard for managing users, stats, and subscriptions.
+* `/pricing` — displays available subscription plans.
+* `/login`, `/register`, `/logout` — authentication endpoints.
+* `/auth/<provider>` — OAuth endpoints for Google, Facebook, GitHub.
 
 **CSV format examples**
 
@@ -211,12 +264,20 @@ joblib
 flask-mail
 python-dotenv
 plotly
+requests
+supabase
+groq
+openai
+flask-cors
+flask-limiter
+bcrypt
+pyjwt
 ```
 
 **Keep the app always-on**
 
 * Add a `/health` endpoint (already included).
-* Use an external uptime monitor (UptimeRobot, Cron-job.org) to ping `https://your-app.onrender.com` every 5–10 minutes. This is the most reliable method for free hosting.
+* Use an external uptime monitor (UptimeRobot, Cron-job.org) to ping `https://your-app.onrender.com  ` every 5–10 minutes. This is the most reliable method for free hosting.
 * Optional: self-ping thread *may* be used but is less reliable on some hosts.
 
 **Render-specific tips**
@@ -224,6 +285,7 @@ plotly
 * Keep the model files in repo or on mounted storage. Large models may require storing on an object store (S3) and downloading on startup.
 * Use `gunicorn` in Procfile.
 * Configure environment variables in Render dashboard.
+* Ensure Supabase URL and Key are correctly set as secrets.
 
 ---
 
@@ -238,6 +300,20 @@ MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=app-or-smtp-password
 MAIL_DEFAULT_RECEIVER=admin@yourdomain.com
 PORT=5000
+SUPABASE_URL=your-supabase-url
+SUPABASE_KEY=your-supabase-anon-key
+GROQ_API_KEY=your-groq-api-key
+OPENAI_API_KEY=your-openai-api-key
+PAYSTACK_SECRET_KEY=your-paystack-secret-key
+PAYSTACK_PUBLIC_KEY=your-paystack-public-key
+REMOTE_MODEL_BASE=https://example.com/models # Optional
+CLINICAL_MODEL_FILE=heart_rf_clinical.pkl
+CLINICAL_SCALER_FILE=heart_scaler_clinical.pkl
+CLINICAL_TEMPLATE_FILE=heart_user_template_clinical.csv
+LIFESTYLE_MODEL_FILE=heart_rf_lifestyle.pkl
+LIFESTYLE_SCALER_FILE=heart_scaler_lifestyle.pkl
+LIFESTYLE_TEMPLATE_FILE=heart_user_template_lifestyle.csv
+CHAT_SYSTEM_PROMPT=You are CardioConsult, a medically informed assistant...
 ```
 
 > Never commit `.env` or secrets to git. Use the Render/host provider secret manager.
@@ -277,6 +353,11 @@ PORT=5000
 
 * Place your model artifacts into `/models` or update `app.py` configuration to point to correct locations.
 
+**5. Supabase Authentication Error**
+
+* Ensure `SUPABASE_URL` and `SUPABASE_KEY` are correct and the API key has sufficient permissions.
+* Check if email confirmation is enabled in Supabase Auth settings if required.
+
 ---
 
 ## Testing & Sample Data
@@ -310,7 +391,7 @@ PORT=5000
 * **Account Management** — sign-up, sign-in, password reset (Auth via provider or custom).
 * **Subscription Plans & Payments** — integrate Paystack / Stripe for freemium / paid tiers, recurring subscriptions.
 * **Admin Dashboard** — manage users, view aggregated stats, moderate results, push notifications.
-* **Notification System** — email alerts or SMS when risk crosses thresholds.
+* **Notification System** — email alerts or SMS when risk crosses thresholds. (Upcoming)
 
 ### AI & Advanced
 
@@ -322,6 +403,21 @@ PORT=5000
 * **Voice & Conversational UI** — speech-to-text + text-to-speech, allowing voice queries and responses for CardioConsultant.
 * **Model Explainability** — SHAP/LIME explanations for single predictions (feature contribution visualization).
 * **Real-time Monitoring & Drift Detection** — monitor model performance and data drift on incoming data.
+
+---
+
+## AI Tools Used in Development
+
+This project leveraged several AI tools during its development lifecycle to enhance efficiency, code quality, and problem-solving:
+
+*   **GitHub Copilot**:
+    *   **Impact**: Copilot was instrumental in generating boilerplate code for Flask routes, helper functions, and even parts of the HTML Jinja2 templates. It significantly reduced the time spent on writing repetitive code structures and provided suggestions for implementing complex logic based on comments and function names. It was particularly helpful for debugging by suggesting fixes for syntax errors and common Python/pandas/scikit-learn issues.
+*   **Qwen (Alibaba Cloud)**:
+    *   **Impact**: Qwen was used for more detailed explanations of code snippets, especially regarding Supabase integration, OAuth flows, and structuring the subscription management logic. It helped in understanding how to best utilize specific libraries and APIs, and provided alternative approaches to implementing certain features.
+*   **ChatGPT (OpenAI)**:
+    *   **Impact**: ChatGPT was valuable for brainstorming architectural decisions, refining prompts for the AI chat endpoint, and explaining complex concepts related to machine learning model preprocessing and deployment strategies. It was also used to help refactor code for better readability and structure, and to generate documentation and comments.
+
+These tools acted as intelligent assistants, accelerating the development process and helping to address challenges more effectively.
 
 ---
 
@@ -341,7 +437,7 @@ Please open issues for bugs or feature requests.
 ## License & Credits
 
 * **License:** MIT (or choose your preferred OSS license).
-* **Acknowledgements:** UCI Heart datasets, Kaggle Cardio dataset, Plotly, TailwindCSS, Flask community.
+* **Acknowledgements:** UCI Heart datasets, Kaggle Cardio dataset, Plotly, TailwindCSS, Flask community, Supabase, Groq, OpenAI, GitHub Copilot, Qwen, ChatGPT.
 
 ---
 
@@ -349,9 +445,9 @@ Please open issues for bugs or feature requests.
 
 If you want help extending this project, integrating payments, or building the CardioConsultant AI, reach out:
 
-* Email: `support@heartpredict.ai` (configured via `.env`)
-* GitHub: `<your-github-url>`
-
+* Email: `cs@pimconcepts.com.ng` (configured via `.env`)
+* GitHub: `https://github.com/Miftau/CardioGuard`
+or use the Contact form on the Contact page
 ---
 
 ## Examples & Quick Tips
@@ -367,5 +463,3 @@ If you want help extending this project, integrating payments, or building the C
 **3. Keep results clean**
 
 * `static/results` stores CSV outputs. Consider a scheduled job to purge older files or move to S3 for a production app.
-
-
