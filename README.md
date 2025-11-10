@@ -385,12 +385,6 @@ CHAT_SYSTEM_PROMPT=You are CardioConsult, a medically informed assistant...
 > These features are **planned** and **not yet implemented**. They are included here so contributors and stakeholders know the direction.
 
 ### User-facing
-
-* **User Dashboard** — per-user history of predictions, filterable with date ranges and downloadable reports.
-* **Charts & Visualizations** — time-series, risk trends, feature importance per user (Plotly/Chart.js).
-* **Account Management** — sign-up, sign-in, password reset (Auth via provider or custom).
-* **Subscription Plans & Payments** — integrate Paystack / Stripe for freemium / paid tiers, recurring subscriptions.
-* **Admin Dashboard** — manage users, view aggregated stats, moderate results, push notifications.
 * **Notification System** — email alerts or SMS when risk crosses thresholds. (Upcoming)
 
 ### AI & Advanced
