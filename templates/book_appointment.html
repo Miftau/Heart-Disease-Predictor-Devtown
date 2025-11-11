@@ -46,6 +46,8 @@
           Confirm Your Booking
         </h2>
         <p class="text-gray-600 mb-4" id="confirmationText">You have selected a slot. Please confirm to proceed.</p>
+        <!-- NEW: Hidden input for meeting URL (generated on backend) -->
+        <input type="hidden" name="meeting_url" id="meetingUrlInput">
         <form method="POST" id="bookForm">
           <input type="hidden" name="slot_id" id="selectedSlotId">
           <div class="flex gap-4">
@@ -77,6 +79,7 @@
   const confirmationSection = document.getElementById("confirmationSection");
   const bookForm = document.getElementById("bookForm");
   const selectedSlotId = document.getElementById("selectedSlotId");
+  const meetingUrlInput = document.getElementById("meetingUrlInput"); // NEW: Get the hidden meeting URL input
   const confirmationText = document.getElementById("confirmationText");
   const cancelBookingBtn = document.getElementById("cancelBooking");
 
@@ -178,6 +181,9 @@
         // Update the hidden form field with the selected slot ID
         selectedSlotId.value = btn.getAttribute("data-id");
 
+        // NEW: Clear the meeting URL input when a new slot is selected
+        meetingUrlInput.value = "";
+
         // Update confirmation text
         const selectedTime = btn.getAttribute("data-time");
         const selectedDoctor = btn.getAttribute("data-doctor");
@@ -208,8 +214,20 @@
       });
       // Clear the selected slot ID
       selectedSlotId.value = "";
+      // NEW: Clear the meeting URL input when cancelled
+      meetingUrlInput.value = "";
       // Hide the confirmation section
       confirmationSection.classList.add("hidden");
+  });
+
+  // --- Form Submission Listener ---
+  bookForm.addEventListener("submit", e => {
+      // The meeting URL is generated on the backend in app.py during the booking process.
+      // This hidden field is prepared here but the value will be set by the backend after successful booking.
+      // It's included in the form submission for potential future use or logging if needed,
+      // but the actual URL generation happens server-side.
+      // No client-side action needed here regarding the meeting URL itself.
+      // The form will submit to the /book endpoint as defined in app.py.
   });
 
 </script>

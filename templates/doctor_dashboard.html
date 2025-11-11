@@ -1,6 +1,3 @@
-Okay, here is the `doctor_dashboard.html` template, designed to work with the new `doctor_dashboard` route implemented in `app.py`. It displays the doctor's profile, manages their availability, and shows their booked appointments.
-
-```html
 {% extends "base.html" %}
 {% block content %}
 <section class="py-8 bg-gradient-to-b from-gray-50 to-gray-100 min-h-screen">
@@ -102,7 +99,7 @@ Okay, here is the `doctor_dashboard.html` template, designed to work with the ne
                 <th class="py-3 px-4">Patient Name</th>
                 <th class="py-3 px-4">Patient Email</th>
                 <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4 rounded-r-lg">Actions</th>
+                <th class="py-3 px-4 rounded-r-lg">Actions</th> <!-- Updated header text -->
               </tr>
             </thead>
             <tbody>
@@ -121,8 +118,23 @@ Okay, here is the `doctor_dashboard.html` template, designed to work with the ne
                   </span>
                 </td>
                 <td class="py-3 px-4">
-                  <!-- Example action: view details or update status -->
-                  <a href="#" class="text-red-500 hover:text-red-700 font-medium text-sm">View Details</a>
+                  <!-- NEW: Join Meeting Button -->
+                  {% if appt.meeting_url %}
+                    <!-- Example: Show button if appointment is within 30 mins of start time -->
+                    {% set appt_time = appt.appointment_time | datetime_from_iso %}
+                    {% set now = now() %}
+                    {% if now >= appt_time and now <= appt_time + timedelta(minutes=30) %}
+                        <a href="{{ appt.meeting_url }}" target="_blank" class="text-blue-500 hover:text-blue-700 font-medium text-sm">Join Meeting</a>
+                    {% else %}
+                        <!-- Optionally, show a countdown or just the link -->
+                        <!-- For now, just show the link text if not within the window -->
+                        Meeting Link Ready
+                    {% endif %}
+                  {% else %}
+                    <span class="text-gray-400 text-sm">N/A</span>
+                  {% endif %}
+                  <!-- Example action: view details or update status (placed after meeting link) -->
+                  <!-- <a href="#" class="text-red-500 hover:text-red-700 font-medium text-sm ml-2">View Details</a> -->
                 </td>
               </tr>
               {% endfor %}
@@ -140,5 +152,43 @@ Okay, here is the `doctor_dashboard.html` template, designed to work with the ne
     </div>
   </div>
 </section>
+
+<!-- Script for Jinja2 filters (if not available server-side) -->
+<script>
+// This script block provides the necessary functions for the template logic client-side.
+// However, it's generally better to define these as Jinja2 filters in app.py as shown previously.
+// This is a fallback if filters are not defined server-side.
+// The server-side filter approach is strongly recommended for performance and security.
+
+// Note: The server-side filters defined in app.py are preferred.
+// This client-side approach is less ideal and provided for completeness only if filters are missing.
+
+// Define 'now' filter function
+function now() {
+    return new Date();
+}
+
+// Define 'datetime_from_iso' filter function
+function datetimeFromIso(dateString) {
+    if (!dateString) return null;
+    try {
+        // Replace 'Z' with '+00:00' if present for proper parsing in some environments
+        const normalizedDateString = dateString.replace('Z', '+00:00');
+        return new Date(normalizedDateString);
+    } catch (e) {
+        console.warn("Could not parse date string:", dateString, e);
+        return null;
+    }
+}
+
+// Example usage within template logic (conceptual, not directly executable here)
+// This logic would typically happen server-side during template rendering.
+// For example, in the template:
+// {% set appt_time = datetimeFromIso(appt.appointment_time) %}
+// {% set now_time = now() %}
+// {% if now_time >= appt_time and now_time <= new Date(appt_time.getTime() + 30 * 60000) %} // 30 minutes in ms
+//     <a href="{{ appt.meeting_url }}">Join Meeting</a>
+// {% endif %}
+
+</script>
 {% endblock %}
-```

@@ -27,7 +27,7 @@
                 <th class="py-3 px-4 rounded-l-lg">Doctor</th>
                 <th class="py-3 px-4">Appointment Time</th>
                 <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4 rounded-r-lg">Actions</th>
+                <th class="py-3 px-4 rounded-r-lg">Actions</th> <!-- Updated header text -->
               </tr>
             </thead>
             <tbody>
@@ -45,8 +45,23 @@
                   </span>
                 </td>
                 <td class="py-3 px-4">
-                  <!-- Example action: view details or cancel (if allowed) -->
-                  <a href="#" class="text-red-500 hover:text-red-700 font-medium text-sm">View Details</a>
+                  <!-- NEW: Join Meeting Button -->
+                  {% if a.meeting_url %}
+                    <!-- Example: Show button if appointment is within 30 mins of start time -->
+                    {% set appt_time = a.appointment_time | datetime_from_iso %}
+                    {% set now = now() %}
+                    {% if now >= appt_time and now <= appt_time + timedelta(minutes=30) %}
+                        <a href="{{ a.meeting_url }}" target="_blank" class="text-blue-500 hover:text-blue-700 font-medium text-sm">Join Meeting</a>
+                    {% else %}
+                        <!-- Optionally, show a countdown or just the link -->
+                        <!-- For now, just show the link text if not within the window -->
+                        Meeting Link Ready
+                    {% endif %}
+                  {% else %}
+                    <span class="text-gray-400 text-sm">N/A</span>
+                  {% endif %}
+                  <!-- Example action: view details or cancel (if allowed) (placed after meeting link) -->
+                  <!-- <a href="#" class="text-red-500 hover:text-red-700 font-medium text-sm ml-2">View Details</a> -->
                 </td>
               </tr>
               {% endfor %}

@@ -97,6 +97,38 @@ def inject_now():
     return {"current_year": datetime.now().year}
 
 # ============================================================
+# Custom Jinja2 Filters
+# ============================================================
+
+@app.template_filter('datetime_from_iso')
+def datetime_from_iso_filter(date_string):
+    """Convert an ISO format date string (YYYY-MM-DDTHH:MM:SS.ssssss) to a datetime object."""
+    if not date_string:
+        return None
+    try:
+        # Handle different potential formats, e.g., with/without microseconds, with/without 'Z'
+        # The most common format from Supabase is YYYY-MM-DDTHH:MM:SS.ssssss+ZZ:ZZ
+        # But the basic YYYY-MM-DDTHH:MM:SS also occurs
+        # datetime.fromisoformat() is quite robust for standard ISO formats
+        return datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+    except ValueError:
+        # If parsing fails, return None or raise an error as appropriate
+        print(f"Warning: Could not parse date string '{date_string}' using fromisoformat.")
+        try:
+            # Fallback: Try parsing without microseconds if the string contains them
+            # This is less robust and assumes a specific format, better to rely on fromisoformat if possible
+            return datetime.strptime(date_string.split('.')[0], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            print(f"Warning: Could not parse date string '{date_string}' with fallback method either.")
+            return None
+
+@app.template_filter('now')
+def now_filter():
+    """Return the current datetime object."""
+    return datetime.now()
+
+
+# ============================================================
 # Configuration & Constants
 # ============================================================
 
