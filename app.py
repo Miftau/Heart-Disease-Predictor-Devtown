@@ -32,6 +32,7 @@ import requests
 import markdown
 import jwt
 from datetime import datetime, timezone, timedelta
+import hashlib
 from typing import List, Tuple, Optional
 from groq import Groq
 from supabase import create_client, Client
@@ -155,6 +156,78 @@ BASE_COLUMNS_LIFESTYLE = [
     "age", "gender", "height", "weight", "ap_hi", "ap_lo",
     "cholesterol", "gluc", "smoke", "alco", "active"
 ]
+
+# ============================================================
+# Virtual Meeting System (Jitsi) Helpers
+# ============================================================
+
+def generate_jitsi_url(appointment_id, appointment_time_str):
+    """
+    Generates a unique Jitsi meeting URL based on appointment details.
+    Uses a deterministic hash to ensure the same appointment gets the same room.
+    """
+    # Create a unique identifier for the meeting room
+    # Combining appointment ID and time should be sufficient
+    unique_identifier = f"{appointment_id}_{appointment_time_str}"
+    # Use SHA-256 hash to create a deterministic, unique room name
+    room_hash = hashlib.sha256(unique_identifier.encode()).hexdigest()
+    # Truncate the hash for readability (e.g., first 12 characters)
+    room_name = room_hash[:12]
+    # Use a public Jitsi server or your own self-hosted one
+    jitsi_server = os.getenv("JITSI_SERVER_URL", "https://meet.jit.si") # e.g., "https://your-jitsi-instance.com"
+    return f"{jitsi_server}/{room_name}"
+
+# ============================================================
+# Notification System (Email) Helpers
+# ============================================================
+
+def send_appointment_reminder_email(appointment_id, user_email, user_name, doctor_name, appointment_time_str):
+    """
+    Sends an email reminder for an appointment.
+    """
+    try:
+        msg = Message(
+            subject="[CardioGuard] Appointment Reminder",
+            recipients=[user_email],
+            body=f"""
+            Dear {user_name},
+
+            This is a friendly reminder that you have an appointment scheduled with Dr. {doctor_name} on {appointment_time_str}.
+
+            Please ensure you are ready for the session.
+
+            Best regards,
+            The CardioGuard Team
+            """
+        )
+        mail.send(msg)
+        print(f"✅ Reminder email sent to {user_email} for appointment {appointment_id}")
+        # Optionally, log this to the 'notifications' table
+        supabase.table("notifications").insert({
+            "user_id": session.get("user_id"), # This might need adjustment if called outside a request context
+            "appointment_id": appointment_id,
+            "type": "appointment_reminder",
+            "message": f"Reminder for appointment with Dr. {doctor_name} on {appointment_time_str}",
+            "channel": "email",
+            "status": "sent"
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send reminder email for appointment {appointment_id}: {e}")
+        # Optionally, log failure to the 'notifications' table
+        try:
+            supabase.table("notifications").insert({
+                "user_id": session.get("user_id"), # This might need adjustment if called outside a request context
+                "appointment_id": appointment_id,
+                "type": "appointment_reminder",
+                "message": f"Failed to send reminder for appointment with Dr. {doctor_name} on {appointment_time_str}",
+                "channel": "email",
+                "status": "failed",
+                "message": str(e) # Store error details
+            }).execute()
+        except Exception as log_e:
+            print(f"❌ Failed to log notification failure: {log_e}")
+        return False
 
 # ============================================================
 # Utility Functions
@@ -1222,7 +1295,7 @@ def book_appointment():
         slot_id = request.form.get("slot_id")
         # Fetch slot
         slot_data = supabase.table("doctor_availability").select("*").eq("id", slot_id).single().execute()
-        if not slot_data.data:
+        if not slot_data.
             flash("Invalid slot selected.", "danger")
             return redirect(url_for("book_appointment"))
 
@@ -1237,15 +1310,31 @@ def book_appointment():
         dt_str = f"{slot['available_date']} {slot['start_time']}"
         appointment_time = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
 
+        # --- NEW: Generate Jitsi URL ---
+        jitsi_url = generate_jitsi_url(slot_id, dt_str) # Use slot_id and time_str for uniqueness
+
         supabase.table("appointments").insert({
             "user_id": user_id,
             "doctor_id": doctor_id,
             "appointment_time": appointment_time.isoformat(),
-            "status": "pending"
+            "status": "pending",
+            "meeting_url": jitsi_url # Add the generated URL
         }).execute()
 
         # Mark slot as booked
         supabase.table("doctor_availability").update({"is_booked": True}).eq("id", slot_id).execute()
+
+        # --- NEW: Send Appointment Reminder Email ---
+        # Fetch doctor details for the email
+        doctor_details = supabase.table("doctors").select("id, specialization").eq("id", doctor_id).single().execute().data
+        user_details = supabase.table("users").select("name, email").eq("id", user_id).single().execute().data
+
+        doctor_name = doctor_details.get("specialization", "Unknown") # Or fetch from user table if needed
+        user_name = user_details.get("name")
+        user_email = user_details.get("email")
+        appointment_time_str = appointment_time.strftime("%Y-%m-%d at %H:%M")
+
+        send_appointment_reminder_email(slot_id, user_email, user_name, doctor_name, appointment_time_str)
 
         flash("Appointment booked successfully!", "success")
         return redirect(url_for("user_dashboard"))
@@ -1280,8 +1369,9 @@ def book_appointment():
 @login_required
 def my_bookings():
     user_id = session.get("user_id")
+    # --- NEW: Include meeting_url in query ---
     appointments = supabase.table("appointments").select(
-        "id, appointment_time, status, doctor_id"
+        "id, appointment_time, status, doctor_id, meeting_url" # Include meeting_url
     ).eq("user_id", user_id).order("appointment_time", desc=True).execute().data
 
     doctor_lookup = {}
@@ -1293,7 +1383,6 @@ def my_bookings():
         print("Doctor fetch error:", e)
 
     return render_template("my_bookings.html", appointments=appointments, doctors=doctor_lookup)
-
 # ============================================================
 # Routes - Subscription Management
 # ============================================================
@@ -1410,8 +1499,8 @@ def doctor_dashboard():
     # If doctor_id isn't in session, fetch it from the doctors table
     if not doctor_id:
         try:
-            doc_data = supabase.table("doctors").select("id").eq("user_id", user_id).single().execute()
-            if doc_data and doc_data.data:
+            doc_data = supabase.table("doctors").select("id").eq("id", user_id).single().execute()
+            if doc_data and doc_data.
                 doctor_id = doc_data.data["id"]
                 session["doctor_id"] = doctor_id # Store for future use in this session
             else:
@@ -1433,7 +1522,8 @@ def doctor_dashboard():
         availability_slots = supabase.table("doctor_availability").select("*").eq("doctor_id", doctor_id).order("available_date").execute().data
 
         # Fetch booked appointments for this doctor
-        booked_appointments = supabase.table("appointments").select("id, user_id, appointment_time, status").eq("doctor_id", doctor_id).order("appointment_time").execute().data
+        # --- NEW: Include meeting_url in query ---
+        booked_appointments = supabase.table("appointments").select("id, user_id, appointment_time, status, meeting_url").eq("doctor_id", doctor_id).order("appointment_time").execute().data # Include meeting_url
 
         # Optionally, fetch user details for the booked appointments
         user_ids_needed = [appt["user_id"] for appt in booked_appointments]
@@ -1471,8 +1561,9 @@ def user_dashboard():
         records = supabase.table("records").select("*").eq("user_id", user_id).order("created_at", desc=True).execute().data
 
         # Fetch user's booked appointments
+        # --- NEW: Include meeting_url in query ---
         appointments = supabase.table("appointments").select(
-            "id, doctor_id, appointment_time, status"
+            "id, doctor_id, appointment_time, status, meeting_url" # Include meeting_url
         ).eq("user_id", user_id).order("appointment_time", desc=True).execute().data
 
         # Fetch doctor details for the appointments
@@ -1497,7 +1588,7 @@ def user_dashboard():
         else:
             labels, scores = [], []
 
-        # --- Fetch user subscriptions ---
+        # --- NEW: Fetch user subscriptions ---
         user_subscriptions = supabase.table("user_subscriptions").select(
             "*, subscription_plans(name, price, duration_days, is_free)"
         ).eq("user_id", user_id).execute().data
@@ -1505,18 +1596,16 @@ def user_dashboard():
         # Determine current plan status for UI hints
         current_plan_is_free = True
         if user_subscriptions:
-            if active_subs := [
-                sub
-                for sub in user_subscriptions
-                if sub.get("status") != "cancelled"
-            ]:
+            # Get the most recent active or non-cancelled subscription
+            active_subs = [sub for sub in user_subscriptions if sub.get("status") != "cancelled"]
+            if active_subs:
                 # Sort by start_date descending to get the latest
                 latest_sub = sorted(active_subs, key=lambda x: x.get("start_date", ""), reverse=True)[0]
                 plan_info = latest_sub.get("subscription_plans", {})
                 current_plan_is_free = plan_info.get("is_free", True)
 
     except Exception as e:
-        print(f"Error fetching user dashboard data: {e}")
+        print(f"Error fetching user dashboard  {e}")
         flash("Error loading dashboard data. Please try again later.", "danger")
         return redirect(url_for("login")) # Or render a partial template
 
@@ -1531,7 +1620,8 @@ def user_dashboard():
         user_subscriptions=user_subscriptions, # Pass subscriptions to the template
         current_plan_is_free=current_plan_is_free # Pass plan status for UI
     )
-
+    
+    
 @app.route("/admin/dashboard")
 @login_required
 def admin_dashboard():
@@ -1572,7 +1662,7 @@ def admin_dashboard():
             role = user.get("role", "user") # Default to 'user' if role is missing
             role_counts[role] = role_counts.get(role, 0) + 1
 
-        # --- NEW: Activity Chart Data ---
+        # --- Activity Chart Data ---
         # Example: Fetch user registrations over time (last 6 months)
         # Get the date 6 months ago
         six_months_ago = datetime.now(timezone.utc) - timedelta(days=6*30)
@@ -1601,7 +1691,7 @@ def admin_dashboard():
         # Prepare data for appointments, aligning with activity_labels
         appt_activity_data = [appointment_counts.get(date, 0) for date in activity_labels]
 
-        # --- NEW: Fetch all user subscriptions for admin ---
+        # --- Fetch all user subscriptions for admin ---
         user_subscriptions = supabase.table("user_subscriptions").select(
             "id, user_id, status, start_date, end_date, subscription_plans(name, price)"
         ).execute().data
