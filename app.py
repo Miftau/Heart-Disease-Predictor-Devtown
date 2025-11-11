@@ -1532,7 +1532,7 @@ def doctor_dashboard():
     if not doctor_id:
         try:
             doc_data = supabase.table("doctors").select("id").eq("id", user_id).single().execute()
-            if doc_data and doc_data.
+            if doc_data and doc_data:
                 doctor_id = doc_data.data["id"]
                 session["doctor_id"] = doctor_id # Store for future use in this session
             else:
