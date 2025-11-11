@@ -1327,7 +1327,7 @@ def book_appointment():
         slot_id = request.form.get("slot_id")
         # Fetch slot
         slot_data = supabase.table("doctor_availability").select("*").eq("id", slot_id).single().execute()
-        if not slot_data.
+        if not slot_data:
             flash("Invalid slot selected.", "danger")
             return redirect(url_for("book_appointment"))
 
