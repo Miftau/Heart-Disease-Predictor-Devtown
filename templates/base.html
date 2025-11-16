@@ -199,9 +199,10 @@
       <ul id="mobile-menu"
           class="hidden flex-col w-full mt-4 space-y-4 text-gray-700 bg-white absolute top-full left-0 shadow-lg sm:shadow-none sm:flex sm:flex-row sm:space-x-6 sm:w-auto sm:mt-0 sm:space-y-0 sm:bg-transparent sm:static sm:block">
 
-        {% macro nav_item(url, label) %}
+        {% macro nav_item(url, label, is_external=false) %}
           <li>
             <a href="{{ url }}"
+            {% if is_external %}target="_blank" rel="noopener noreferrer"{% endif %}
                class="block hover:text-red-500 text-lg sm:text-xl transition-all duration-300 px-4 py-2 sm:p-0
                       {% if request.path == url %}nav-active{% endif %}">
               {{ label }}
@@ -213,7 +214,9 @@
         {{ nav_item('/about', 'About') }}
         {{ nav_item('/contact', 'Contact') }}
         {{ nav_item('/resources', 'Resources') }}
-        {{ nav_item('/chat', 'CardioConsultant') }}
+        {{ nav_item('/chat', 'CardioAI') }}
+        {{ nav_item('https://renalguard.onrender.com', 'RenalGuard', is_external=true) }}
+        {{ nav_item('https://hepaguard.onrender.com', 'HepaGuard', is_external=true) }}
 
         <li>
           <a href="/form"
