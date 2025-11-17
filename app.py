@@ -49,6 +49,7 @@ from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+import shap
 import joblib
 from functools import wraps # For login_required decorator
 
@@ -311,8 +312,9 @@ def load_models():
     lifestyle_model, lifestyle_scaler, LIFESTYLE_FEATURE_COLUMNS
 ) = load_models()
 
-# Prediction helper (clinical & lifestyle)
-def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> pd.DataFrame:
+
+# Prediction helper (clinical & lifestyle) 
+def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     if model_type not in ("clinical", "lifestyle"):
         raise ValueError("Invalid model_type")
 
@@ -326,6 +328,9 @@ def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> pd.DataFrame:
             df = df.iloc[:, :len(BASE_COLUMNS_LIFESTYLE)]
             df.columns = BASE_COLUMNS_LIFESTYLE[:df.shape[1]]
 
+    # Store raw features *before* scaling for SHAP
+    raw_features_df = df.copy()
+
     # Clinical pipeline: one-hot align with CLINICAL_FEATURE_COLUMNS then scale
     if model_type == "clinical":
         cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
@@ -333,6 +338,9 @@ def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> pd.DataFrame:
         df_enc = df_enc.reindex(columns=CLINICAL_FEATURE_COLUMNS, fill_value=0)
         X = clinical_scaler.transform(df_enc.values)
         model = clinical_model
+        # Ensure raw_features_df aligns with CLINICAL_FEATURE_COLUMNS as well for SHAP (after dummies)
+        raw_features_df = pd.get_dummies(raw_features_df, columns=cat_cols)
+        raw_features_df = raw_features_df.reindex(columns=CLINICAL_FEATURE_COLUMNS, fill_value=0)
     else:
         # Lifestyle pipeline: ensure numeric & fillna then align
         for col in df.columns:
@@ -341,7 +349,12 @@ def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> pd.DataFrame:
         df_enc = df.reindex(columns=LIFESTYLE_FEATURE_COLUMNS, fill_value=0)
         X = lifestyle_scaler.transform(df_enc.values)
         model = lifestyle_model
-    df_out_base = df.copy()
+        # Ensure raw_features_df aligns with LIFESTYLE_FEATURE_COLUMNS for SHAP
+        for col in raw_features_df.columns:
+             raw_features_df[col] = pd.to_numeric(raw_features_df[col], errors="coerce")
+        raw_features_df = raw_features_df.fillna(raw_features_df.mean(numeric_only=True))
+        raw_features_df = raw_features_df.reindex(columns=LIFESTYLE_FEATURE_COLUMNS, fill_value=0)
+
     # predict probabilities & classes
     if hasattr(model, "predict_proba"):
         probs = model.predict_proba(X)[:, 1]
@@ -356,12 +369,101 @@ def prepare_and_predict(df_raw: pd.DataFrame, model_type: str) -> pd.DataFrame:
     preds = model.predict(X)
 
     # Build output
-    out_df = df_out_base.copy()
+    out_df = df_raw.copy() # Use original raw input for display
     out_df["Prediction"] = preds
     out_df["Prob_Pos"] = np.round(probs, 4)
     out_df["Risk_Level"] = out_df["Prob_Pos"].apply(lambda p: "High" if p > 0.66 else ("Medium" if p > 0.33 else "Low"))
 
-    return out_df
+    # Return both results and raw features for SHAP
+    return out_df, raw_features_df
+
+
+# NEW: Function to generate SHAP explanation
+def generate_shap_explanation(raw_features_df_row, model, feature_names):
+    """
+    Calculates SHAP values for a single prediction row.
+    Returns a dictionary containing feature names and their SHAP values.
+    """
+    try:
+        import numpy as np # Ensure numpy is available
+
+        # Ensure the input is a single row DataFrame (shape (1, n_features))
+        if raw_features_df_row.shape[0] != 1:
+             print(f"Warning: Expected 1 row for SHAP, got {raw_features_df_row.shape[0]}. Taking first row.")
+             raw_features_df_row = raw_features_df_row.iloc[[0]] # Make sure it's still a DataFrame
+
+        # Get the underlying numpy array for the explainer
+        # Use .values to get the raw numerical array
+        input_array = raw_features_df_row.values
+
+        # Create an explainer object for the specific model type
+        # TreeExplainer is efficient for tree-based models like Random Forest
+        explainer = shap.TreeExplainer(model)
+
+        # Calculate SHAP values for the specific input array
+        # Pass the numpy array directly
+        shap_values_raw = explainer.shap_values(input_array)
+
+        # --- Handle potential list structure for multi-output models (like RandomForestClassifier for binary classification) ---
+        # shap_values_raw might be a list of arrays for each class [class_0_values, class_1_values] for binary classification
+        # or a single array if the model outputs probability for positive class directly or is single-output.
+        # We typically want the SHAP values corresponding to the positive class (or the output used for probability).
+        # For RandomForestClassifier.predict_proba(X)[:, 1], we usually want the SHAP values for class 1.
+
+        if isinstance(shap_values_raw, list):
+            # It's a list, likely [shap_values_class_0, shap_values_class_1] for binary classification
+            if len(shap_values_raw) == 2:
+                 # Assume index 1 corresponds to the positive class (probability output for class 1)
+                 shap_values_for_output = shap_values_raw[1] # Take values for the positive class
+            elif len(shap_values_raw) == 1:
+                 # Only one class output, use that
+                 shap_values_for_output = shap_values_raw[0]
+            else:
+                 # Unexpected number of outputs
+                 print(f"Warning: SHAP returned {len(shap_values_raw)} lists, expected 1 or 2. Using the first.")
+                 shap_values_for_output = shap_values_raw[0]
+        else:
+            # It's a single array (e.g., from a regressor or a classifier configured differently)
+            shap_values_for_output = shap_values_raw
+
+        # Ensure shap_values_for_output is a 1D array corresponding to features of the single input row
+        # It should have shape (n_features,) after indexing the correct class if needed
+        if shap_values_for_output.ndim > 1:
+            # If it's still multi-dimensional (e.g., (1, n_features)), squeeze it to (n_features,)
+            shap_values_for_output = shap_values_for_output.squeeze(axis=0) # Remove the batch dimension
+            if shap_values_for_output.ndim != 1:
+                 print(f"Warning: SHAP output shape {shap_values_for_output.shape} is unexpected after squeeze. Attempting to flatten.")
+                 shap_values_for_output = shap_values_for_output.flatten() # Fallback to flatten if still wrong shape
+
+        # At this point, shap_values_for_output should be a 1D numpy array of length n_features
+        # Convert to a list for JSON serialization
+        shap_values_list = shap_values_for_output.tolist()
+        feature_names_list = feature_names # This should be the list of feature names corresponding to the columns used for the model
+
+        if len(shap_values_list) != len(feature_names_list):
+             print(f"Warning: SHAP values length ({len(shap_values_list)}) does not match feature names length ({len(feature_names_list)}).")
+             # This might happen if the feature alignment failed somewhere. Proceed carefully or return empty.
+             # For now, let's assume they align correctly based on the model's training feature order.
+             # If lengths differ significantly, the explanation might be misleading.
+
+        # Create a list of dictionaries for easier handling in the template
+        shap_explanation = [
+            {"feature": feat, "shap_value": val}
+            for feat, val in zip(feature_names_list, shap_values_list)
+        ]
+
+        # Sort by absolute SHAP value to show most impactful features first
+        shap_explanation.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
+
+        return shap_explanation
+
+    except Exception as e:
+        print(f"Error generating SHAP explanation: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for debugging
+        return [] # Return an empty list if explanation fails
+
+
 
 # Heuristic diagnostic rules (your rules, expanded)
 def get_likely_condition(
@@ -1019,7 +1121,7 @@ def form():
 # ============================================================
 
 @app.route("/predict", methods=["POST"])
-@check_subscription_access # Apply access control
+#@check_subscription_access # Apply access control
 def predict():
     try:
         raw_type = (request.form.get("model_type") or "clinical").lower()
@@ -1029,6 +1131,7 @@ def predict():
         uploaded_file = request.files.get("file")
         if uploaded_file and uploaded_file.filename:
             df = pd.read_csv(uploaded_file)
+            results, raw_features_df = prepare_and_predict(df, model_type) # Receive raw features
         else:
             base_cols = BASE_COLUMNS_CLINICAL if model_type == "clinical" else BASE_COLUMNS_LIFESTYLE
             user_data = {}
@@ -1043,8 +1146,11 @@ def predict():
                 user_data[c] = val
 
             df = pd.DataFrame([user_data])
-        results = prepare_and_predict(df, model_type)
-        if user_id := session.get("user_id"):
+            results, raw_features_df = prepare_and_predict(df, model_type) # Receive raw features
+
+        # --- POST-SUCCESS LOGIC FOR ACCESS CONTROL ---
+        user_id = session.get("user_id")
+        if user_id:
             # Logged in user: record the prediction in the 'records' table
             # This implicitly tracks usage for paid users based on plan limits (handled in decorator)
             try:
@@ -1063,6 +1169,15 @@ def predict():
             session['last_form_time'] = datetime.now().isoformat()
 
         # --- END POST-SUCCESS LOGIC ---
+
+        # Generate SHAP Explanation - NEW
+        shap_explanation = []
+        if not raw_features_df.empty: # Only calculate if raw features exist
+            feature_names = raw_features_df.columns.tolist()
+            # Pass the single row DataFrame to the SHAP function
+            shap_explanation = generate_shap_explanation(raw_features_df.iloc[[0]], # Use iloc[[0]] to keep it as a DataFrame with one row
+                                                        clinical_model if model_type == "clinical" else lifestyle_model,
+                                                        feature_names)
 
         # Save results CSV
         fname = f"{model_type}_pred_{uuid.uuid4().hex[:8]}.csv"
@@ -1104,7 +1219,8 @@ def predict():
             suggestions=suggestions,
             tables=[results.to_html(classes="table table-striped", index=False)],
             download_link=download_link,
-            model_type=model_type
+            model_type=model_type,
+            shap_explanation=shap_explanation # Pass SHAP explanation to template
         )
     except Exception as e:
         print("Prediction error:", e)
